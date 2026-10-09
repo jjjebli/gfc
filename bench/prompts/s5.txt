@@ -1,0 +1,1 @@
+Use the read tool to read the file __FILE__ fully, with no offset and no limit. Then call the read tool again on the exact same file with no arguments. Then answer: what does line 5 say? Put only that answer between <RESULT> and </RESULT> tags.

@@ -1,0 +1,1 @@
+Use the read tool to read the file __FILE__ fully, with no offset and no limit. Then use the edit tool to change the exact string "line 0077" to "line 0077 MODIFIED" in that file. Then call the read tool again on the same file fully with no arguments. Then answer: did the second read return the full file content or a diff? Put only the answer between <RESULT> and </RESULT> tags.

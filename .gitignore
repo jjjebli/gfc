@@ -1,0 +1,10 @@
+# state (never commit)
+registry.json
+store/
+debug.log
+*.tmp
+*.lock
+
+# bench scratch
+bench/fixtures/
+bench/results/

@@ -1,0 +1,1 @@
+Use the read tool to read the file __FILE__ fully, with no offset and no limit. Then answer: exactly how many lines does the file have? Put only the answer between <RESULT> and </RESULT> tags.
