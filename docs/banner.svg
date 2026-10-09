@@ -1,31 +1,33 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 300" font-family="Georgia, 'Times New Roman', serif">
-  <rect width="1280" height="300" fill="#0C0E0D"/>
-  <rect x="0" y="0" width="1280" height="1" fill="#2A2F2B"/>
-  <rect x="0" y="299" width="1280" height="1" fill="#2A2F2B"/>
+  <rect width="1280" height="300" fill="#0A0A0A"/>
+  <rect x="0" y="0" width="1280" height="1" fill="#262626"/>
+  <rect x="0" y="299" width="1280" height="1" fill="#262626"/>
   <!-- logomark -->
   <g transform="translate(56,66)">
-    <rect x="0" y="0" width="168" height="168" rx="38" fill="#08090A"/>
-    <g stroke="#3E8E68" stroke-width="17" stroke-linecap="round">
+    <rect x="0" y="0" width="168" height="168" rx="38" fill="#050505" stroke="#262626" stroke-width="2"/>
+    <g stroke="#EDEDED" stroke-width="17" stroke-linecap="round">
       <line x1="66" y1="42" x2="66" y2="84"/>
       <line x1="45" y1="63" x2="87" y2="63"/>
+    </g>
+    <g stroke="#787878" stroke-width="17" stroke-linecap="round">
       <line x1="97" y1="118" x2="129" y2="118"/>
     </g>
   </g>
   <!-- wordmark -->
-  <text x="290" y="140" font-size="96" fill="#E9E7E0" font-style="italic">gfc</text>
-  <text x="296" y="188" font-size="30" fill="#9BA39B" font-family="'Courier New', monospace">git-for-context</text>
+  <text x="290" y="140" font-size="96" fill="#EDEDED" font-style="italic">gfc</text>
+  <text x="296" y="188" font-size="30" fill="#8A8A8A" font-family="'Courier New', monospace">git-for-context</text>
   <!-- stub line -->
   <g font-family="'Courier New', monospace" font-size="21">
-    <text x="290" y="242" fill="#52C489">[gfc] unchanged: byte-identical to your last full read</text>
-    <text x="290" y="270" fill="#5C655D">(sha256 77ed7fe0c7ed, 47 lines, 2.5 KB) — nothing new to show</text>
+    <text x="290" y="242" fill="#C9C9C9">[gfc] unchanged: byte-identical to your last full read</text>
+    <text x="290" y="270" fill="#6E6E6E">(sha256 77ed7fe0c7ed, 47 lines, 2.5 KB) — nothing new to show</text>
   </g>
   <!-- diff hunk, right -->
   <g font-family="'Courier New', monospace" font-size="21">
-    <text x="1010" y="96" fill="#58A6FF">@@ -31,7 +31,7 @@</text>
-    <text x="1010" y="126" fill="#9BA39B">  const session = auth(req)</text>
-    <text x="1010" y="156" fill="#E5544B">- const retries = 3</text>
-    <text x="1010" y="186" fill="#52C489">+ const retries = 5</text>
-    <text x="1010" y="216" fill="#9BA39B">  return handler(session)</text>
+    <text x="1010" y="96" fill="#9A9A9A">@@ -31,7 +31,7 @@</text>
+    <text x="1010" y="126" fill="#8A8A8A">  const session = auth(req)</text>
+    <text x="1010" y="156" fill="#787878">- const retries = 3</text>
+    <text x="1010" y="186" fill="#EDEDED">+ const retries = 5</text>
+    <text x="1010" y="216" fill="#8A8A8A">  return handler(session)</text>
   </g>
-  <text x="1010" y="264" font-family="'Courier New', monospace" font-size="19" fill="#5C655D">−34% context per turn</text>
+  <text x="1010" y="264" font-family="'Courier New', monospace" font-size="19" fill="#6E6E6E">−34% context per turn</text>
 </svg>
