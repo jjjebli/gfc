@@ -1,0 +1,512 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>gfc — git-for-context</title>
+<meta name="description" content="Stop paying for files your model already read. Hash-verified stubs for unchanged re-reads, diffs for changed files. OpenCode plugin + MCP server, zero dependencies.">
+<meta property="og:title" content="gfc — git-for-context">
+<meta property="og:description" content="Stop paying for files your model already read. Measured −22% to −34% context per turn.">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..700;1,9..144,300..700&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:ital,wght@0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0C0E0D; --bg2:#111413; --bg3:#161A18;
+  --ink:#E9E7E0; --dim:#9BA39B; --faint:#5C655D;
+  --green:#52C489; --green-dim:#2E6B4C;
+  --red:#E5544B; --blue:#58A6FF; --amber:#D8A657;
+  --line:#232826; --line2:#2E332F;
+  --mono:"JetBrains Mono",ui-monospace,monospace;
+  --sans:"Instrument Sans",system-ui,sans-serif;
+  --serif:"Fraunces",Georgia,serif;
+  --maxw:1060px; --gutter:76px;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:17px;line-height:1.65;-webkit-font-smoothing:antialiased}
+::selection{background:var(--green);color:#08110C}
+a{color:var(--green);text-decoration:none}
+a:hover{text-decoration:underline;text-underline-offset:3px}
+code,.mono{font-family:var(--mono)}
+code{font-size:.86em;background:var(--bg3);border:1px solid var(--line);border-radius:5px;padding:.1em .38em;color:var(--ink);white-space:nowrap}
+
+/* grain */
+body::after{content:"";position:fixed;inset:0;pointer-events:none;opacity:.05;z-index:999;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E")}
+
+/* nav */
+nav{position:fixed;top:0;left:0;right:0;z-index:50;backdrop-filter:blur(14px);background:rgba(12,14,13,.82);border-bottom:1px solid var(--line)}
+.nav-in{max-width:var(--maxw);margin:0 auto;display:flex;align-items:center;gap:28px;padding:14px 28px}
+.brand{display:flex;align-items:center;gap:11px;color:var(--ink)}
+.brand img{width:26px;height:26px;display:block}
+.brand b{font-family:var(--mono);font-weight:700;font-size:16px;letter-spacing:-.02em}
+.brand i{font-family:var(--serif);font-style:italic;font-weight:400;color:var(--dim);font-size:15px}
+nav .links{display:flex;gap:22px;margin-left:auto;font-family:var(--mono);font-size:13.5px}
+nav .links a{color:var(--dim)}
+nav .links a:hover{color:var(--ink);text-decoration:none}
+nav .links a.gh{color:var(--ink);display:flex;align-items:center;gap:7px}
+nav .links a.gh svg{width:17px;height:17px;fill:currentColor}
+@media(max-width:760px){nav .links a:not(.gh){display:none}}
+
+/* layout */
+main{max-width:var(--maxw);margin:0 auto;padding:0 28px}
+section{position:relative;padding:96px 0 0 var(--gutter);max-width:calc(var(--maxw) - 28px)}
+@media(max-width:760px){section{padding-left:0}
+  section::before{display:none}}
+/* read-tool gutter number */
+section::before{content:attr(data-line) ":";position:absolute;left:6px;top:100px;font-family:var(--mono);font-size:14px;color:var(--faint)}
+/* hunk header kicker */
+.hunk{font-family:var(--mono);font-size:13px;color:var(--blue);letter-spacing:.02em;margin-bottom:14px;display:block}
+h2{font-family:var(--serif);font-weight:500;font-size:clamp(30px,4.4vw,44px);line-height:1.08;letter-spacing:-.01em;margin-bottom:22px}
+h2 em{font-style:italic;color:var(--green)}
+.lede{font-size:clamp(17px,2vw,19px);color:var(--dim);max-width:62ch}
+.lede strong{color:var(--ink);font-weight:500}
+p + p{margin-top:14px}
+
+/* hero */
+.hero{min-height:100svh;display:flex;flex-direction:column;justify-content:center;padding-top:130px;padding-left:0}
+.hero h1{font-family:var(--serif);font-weight:400;font-size:clamp(42px,6.8vw,76px);line-height:1.02;letter-spacing:-.015em;max-width:13ch}
+.hero h1 em{font-style:italic;color:var(--green)}
+.hero .lede{margin-top:26px;max-width:58ch}
+.hero .actions{margin-top:36px;display:flex;flex-wrap:wrap;gap:14px;align-items:center}
+.btn{display:inline-flex;align-items:center;gap:10px;font-family:var(--mono);font-size:14px;font-weight:500;padding:12px 22px;border-radius:9px;border:1px solid var(--green);background:var(--green);color:#07130B;transition:transform .18s ease,box-shadow .18s ease;cursor:pointer}
+.btn:hover{transform:translateY(-2px);box-shadow:0 10px 30px -12px rgba(82,196,137,.45);text-decoration:none}
+.btn.ghost{background:transparent;color:var(--ink);border-color:var(--line2)}
+.btn.ghost:hover{border-color:var(--dim);box-shadow:none}
+.btn svg{width:16px;height:16px;fill:currentColor}
+.installline{margin-top:22px;font-family:var(--mono);font-size:13.5px;color:var(--dim)}
+.installline .c{color:var(--ink);background:var(--bg3);border:1px solid var(--line);padding:6px 12px;border-radius:7px;white-space:nowrap}
+.copyable{cursor:pointer;position:relative}
+.copyable:hover{border-color:var(--green)}
+.copyable .tick{color:var(--green);opacity:0;margin-left:8px;transition:opacity .2s}
+.copyable.copied .tick{opacity:1}
+.badges{margin-top:26px;display:flex;gap:10px;flex-wrap:wrap}
+.badge{font-family:var(--mono);font-size:11.5px;color:var(--dim);border:1px solid var(--line);border-radius:99px;padding:4px 12px}
+.badge b{color:var(--green);font-weight:500}
+
+/* terminal */
+.term{margin-top:56px;background:var(--bg2);border:1px solid var(--line2);border-radius:14px;overflow:hidden;box-shadow:0 30px 80px -30px rgba(0,0,0,.6)}
+.term-bar{display:flex;align-items:center;gap:14px;padding:12px 18px;border-bottom:1px solid var(--line);background:var(--bg3);flex-wrap:wrap}
+.term-bar .path{font-family:var(--mono);font-size:13px;color:var(--dim)}
+.term-bar .meter{margin-left:auto;font-family:var(--mono);font-size:13px;color:var(--dim)}
+.term-bar .meter b{color:var(--ink);font-weight:500}
+.meter .saved{color:var(--green);font-weight:700;margin-left:12px;opacity:0;transition:opacity .3s}
+.meter .saved.on{opacity:1}
+.term-body{padding:22px 24px;font-family:var(--mono);font-size:13.5px;line-height:1.75;min-height:340px}
+.term-body .tl{display:block;white-space:pre;overflow-x:auto}
+.tl .ln{color:var(--faint);margin-right:14px;user-select:none}
+.tl.ok{color:var(--ink)}
+.tl.g{color:var(--green)}
+.tl.r{color:var(--red)}
+.tl.c{color:var(--dim)}
+.tl.h{color:var(--blue)}
+.tl.stub{color:var(--green);font-weight:500}
+.trunc{color:var(--faint)}
+.term-btns{display:flex;gap:10px;padding:14px 18px;border-top:1px solid var(--line);background:var(--bg3);flex-wrap:wrap}
+.tbtn{font-family:var(--mono);font-size:13px;color:var(--dim);background:transparent;border:1px solid var(--line2);border-radius:8px;padding:9px 16px;cursor:pointer;transition:all .15s}
+.tbtn:hover{color:var(--ink);border-color:var(--dim)}
+.tbtn.active{color:#07130B;background:var(--green);border-color:var(--green);font-weight:600}
+.tbtn:disabled{opacity:.35;cursor:not-allowed}
+.term-note{font-family:var(--mono);font-size:12px;color:var(--faint);margin-left:auto;align-self:center}
+
+/* diff-row table */
+.rows{margin-top:34px;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.row{display:grid;grid-template-columns:34px 1fr;gap:18px;padding:18px 22px;border-top:1px solid var(--line);background:var(--bg2)}
+.row:first-child{border-top:0}
+.row .sign{font-family:var(--mono);font-size:14px;color:var(--faint)}
+.row.plus .sign{color:var(--green)}
+.row.minus .sign{color:var(--red)}
+.row h3{font-family:var(--mono);font-size:14.5px;font-weight:600;color:var(--ink);margin-bottom:5px}
+.row p{font-size:15px;color:var(--dim);max-width:70ch}
+.row code{white-space:normal}
+
+/* steps */
+.steps{margin-top:34px;display:grid;gap:0}
+.step{display:grid;grid-template-columns:64px 1fr;gap:20px;padding:26px 4px;border-top:1px solid var(--line)}
+.step .n{font-family:var(--serif);font-style:italic;font-size:34px;color:var(--green);line-height:1}
+.step h3{font-size:17px;font-weight:600;margin-bottom:6px}
+.step p{color:var(--dim);font-size:15.5px;max-width:64ch}
+
+/* bench table */
+.bench{margin-top:36px;width:100%;border-collapse:collapse;font-size:15px}
+.bench th{font-family:var(--mono);font-size:12px;font-weight:500;color:var(--faint);text-align:left;padding:10px 14px;border-bottom:1px solid var(--line2);letter-spacing:.04em}
+.bench td{padding:15px 14px;border-bottom:1px solid var(--line);color:var(--dim)}
+.bench td.m{font-family:var(--mono);font-size:13.5px;color:var(--ink);white-space:nowrap}
+.bench .d{font-family:var(--mono);font-weight:700;color:var(--green);white-space:nowrap}
+.bench tr:hover td{background:var(--bg2)}
+.footnote{margin-top:16px;font-size:13.5px;color:var(--faint);font-family:var(--mono);line-height:1.7}
+.tblwrap{overflow-x:auto}
+
+/* install panels */
+.panels{margin-top:36px;display:grid;grid-template-columns:1fr 1fr;gap:20px}
+@media(max-width:860px){.panels{grid-template-columns:1fr}}
+.panel{background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:26px}
+.panel .tag{font-family:var(--mono);font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--green);margin-bottom:10px;display:block}
+.panel h3{font-size:19px;font-weight:600;margin-bottom:6px}
+.panel .sub{font-size:14.5px;color:var(--dim);margin-bottom:18px}
+.panel pre{background:#090B0A;border:1px solid var(--line);border-radius:9px;padding:16px;font-family:var(--mono);font-size:13px;line-height:1.7;overflow-x:auto;position:relative}
+.panel pre:hover{border-color:var(--line2)}
+.panel .after{margin-top:14px;font-size:14px;color:var(--faint)}
+.panel .after b{color:var(--dim);font-weight:500}
+
+/* knobs */
+.knobs{margin-top:30px;display:grid;gap:12px}
+.knob{display:grid;grid-template-columns:180px 1fr;gap:18px;padding:16px 0;border-top:1px solid var(--line);font-size:15px}
+.knob .k{font-family:var(--mono);font-size:13.5px;color:var(--ink)}
+.knob .v{color:var(--dim)}
+@media(max-width:700px){.knob{grid-template-columns:1fr;gap:4px}}
+
+/* limits */
+ul.limits{margin-top:26px;list-style:none;display:grid;gap:14px}
+ul.limits li{display:grid;grid-template-columns:22px 1fr;gap:14px;color:var(--dim);font-size:15.5px;max-width:74ch}
+ul.limits li::before{content:"−";font-family:var(--mono);color:var(--red);font-weight:700}
+ul.limits b{color:var(--ink);font-weight:500}
+
+/* footer */
+footer{margin-top:120px;padding:56px 0 64px;border-top:1px solid var(--line)}
+footer .eof{font-family:var(--mono);font-size:13px;color:var(--faint)}
+footer .cols{display:flex;flex-wrap:wrap;gap:34px;margin-top:22px;align-items:baseline}
+footer a{color:var(--dim);font-family:var(--mono);font-size:13.5px}
+footer a:hover{color:var(--ink)}
+footer .sig{margin-left:auto;font-family:var(--serif);font-style:italic;font-size:15px;color:var(--faint)}
+
+/* reveals */
+.rv{opacity:0;transform:translateY(22px);transition:opacity .7s cubic-bezier(.16,1,.3,1),transform .7s cubic-bezier(.16,1,.3,1)}
+.rv.in{opacity:1;transform:none}
+.rv.d1{transition-delay:.08s}.rv.d2{transition-delay:.16s}.rv.d3{transition-delay:.24s}.rv.d4{transition-delay:.32s}
+@media(prefers-reduced-motion:reduce){.rv{opacity:1;transform:none;transition:none}.btn:hover{transform:none}html{scroll-behavior:auto}}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-in">
+    <a class="brand" href="#top">
+      <img src="favicon.svg" alt="gfc logo">
+      <b>gfc</b><i>git-for-context</i>
+    </a>
+    <div class="links">
+      <a href="#why">why</a>
+      <a href="#how">how</a>
+      <a href="#demo" onclick="return false" style="cursor:default;opacity:.55">demo↑</a>
+      <a href="#bench">measured</a>
+      <a href="#install">install</a>
+      <a class="gh" href="https://github.com/jjjebli/gfc" target="_blank" rel="noopener">
+        <svg viewBox="0 0 16 16"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
+        jjjebli/gfc
+      </a>
+    </div>
+  </div>
+</nav>
+
+<main id="top">
+
+<!-- ============ HERO ============ -->
+<section class="hero" id="hero">
+  <span class="hunk">@@ -0,0 +1,12 @@</span>
+  <h1 class="rv">Stop paying for files your model <em>already&nbsp;read.</em></h1>
+  <p class="lede rv d1"><strong>gfc — git-for-context.</strong> The transcript is a linear replay: every turn re-sends content the model has already seen. gfc treats it like git treats a working tree — the model gets a <strong>diff against what it last saw</strong>, never a full re-checkout. Unchanged re-reads collapse to hash-verified stubs. Changed files return just the hunk. Zero per-turn overhead, zero dependencies.</p>
+
+  <div class="term rv d2" id="demo">
+    <div class="term-bar">
+      <span class="path">read&nbsp;/Users/you/src/server.ts</span>
+      <span class="meter">context this turn: <b id="tok">1,842</b><span class="saved" id="saved">−6,361 tokens</span></span>
+    </div>
+    <div class="term-body" id="term-body">
+      <span class="tl c">// the model reads, re-reads, edits — watch the meter.</span>
+      <span class="tl c">→ press <span class="mono">read</span> to begin.</span>
+    </div>
+    <div class="term-btns">
+      <button class="tbtn" id="b1">read</button>
+      <button class="tbtn" id="b2" disabled>read again</button>
+      <button class="tbtn" id="b3" disabled>edit + read</button>
+      <button class="tbtn" id="b0" disabled style="margin-left:auto">reset</button>
+      <span class="term-note">live demo · exactly what gfc sends the model</span>
+    </div>
+  </div>
+
+  <div class="actions rv d3">
+    <a class="btn" href="https://github.com/jjjebli/gfc" target="_blank" rel="noopener">
+      <svg viewBox="0 0 16 16"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
+      View on GitHub
+    </a>
+    <a class="btn ghost" href="#install">Install in 2 commands →</a>
+  </div>
+
+  <div class="installline rv d4">git clone https://github.com/jjjebli/gfc <span class="c copyable" id="cpcmd">~/.gfc<span class="tick">✓ copied</span></span></div>
+
+  <div class="badges rv d4">
+    <span class="badge">license <b>MIT</b></span>
+    <span class="badge">dependencies <b>0</b></span>
+    <span class="badge">per-turn overhead <b>0 tokens</b></span>
+    <span class="badge">measured <b>−22% to −34%</b> context/turn</span>
+  </div>
+</section>
+
+<!-- ============ WHY ============ -->
+<section id="why" data-line="14">
+  <span class="hunk">@@ -14,9 +14,9 @@</span>
+  <h2>The transcript is a <em>linear replay.</em></h2>
+  <div class="rows rv">
+    <div class="row">
+      <span class="sign">·</span>
+      <div><h3>Re-reads re-pay</h3><p>The only way a model "knows" a file at turn 40 is the file being literally present in the transcript at turn 40. Same 500-line file read ten times? Ten copies. Every one billed, every one diluting attention.</p></div>
+    </div>
+    <div class="row">
+      <span class="sign">·</span>
+      <div><h3>Caching cuts cost, not tokens</h3><p>Provider prompt caches reduce the <i>price</i> of re-sent context — the tokens still flow, still compete for attention, and the cache shatters the moment history changes mid-prefix.</p></div>
+    </div>
+    <div class="row">
+      <span class="sign">·</span>
+      <div><h3>Summarization is lossy</h3><p>Compaction throws away hard-won detail, and the model re-derives what was lost. Waste plus repeated work.</p></div>
+    </div>
+    <div class="row plus">
+      <span class="sign">+</span>
+      <div><h3>gfc: exact, not approximate</h3><p>Not compression — <strong>deduplication</strong>. A sha256 says the bytes are identical, so the duplicate never enters the transcript at all. Nothing is summarized away; the content is verifiably still in context from the first read.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ HOW ============ -->
+<section id="how" data-line="26">
+  <span class="hunk">@@ -26,14 +26,14 @@</span>
+  <h2>How it <em>works.</em></h2>
+  <p class="lede">One registry, one invariant: <strong>the filesystem is the store of truth.</strong> If on-disk content still hashes to the registered value, it is byte-identical to what the model already saw.</p>
+  <div class="steps">
+    <div class="step rv"><div class="n">i.</div><div><h3>Hash every full read</h3><p>sha256 of file content, recorded per session in <code>~/.gfc/registry.json</code>. Registry writes are atomic and cross-process locked — parallel sessions can't corrupt each other.</p></div></div>
+    <div class="step rv d1"><div class="n">ii.</div><div><h3>Intercept before the transcript</h3><p>OpenCode plugin hooks <code>tool.execute.after</code> and replaces repeat content <strong>before it enters the message history</strong>. The duplicate never exists.</p></div></div>
+    <div class="step rv d2"><div class="n">iii.</div><div><h3>Return the delta</h3><p>Unchanged → a ~45-token stub citing the hash. Changed → a unified diff of last-seen → current. Slice reads always pass through, with a note if the file drifted.</p></div></div>
+    <div class="step rv d3"><div class="n">iv.</div><div><h3>Scope to the session</h3><p>Models are stateless: the first full read in any session is always real content. No stub can ever hide something the model hasn't seen. Compaction receives the verified-file list so summaries stay lean.</p></div></div>
+  </div>
+
+  <div class="rows rv d2">
+    <div class="row plus"><span class="sign">+</span><div><h3>Re-read, unchanged file</h3><p><code>[gfc] unchanged: "/src/server.ts" is byte-identical to the full content already present earlier in this conversation (sha256 77ed7fe0c7ed, 47 lines). Nothing new to show.</code></p></div></div>
+    <div class="row"><span class="sign">±</span><div><h3>Re-read, changed file</h3><p>A diff hunk instead of the file: <code>@@ -31,7 +31,7 @@ − const retries = 3 / + const retries = 5</code> — plus the full-file footer if the model needs a region again.</p></div></div>
+    <div class="row"><span class="sign">·</span><div><h3>Slice reads (offset/limit)</h3><p>Real lines, always — the model explicitly asked for them. If the file changed since its last full read, a note says so before the lines.</p></div></div>
+    <div class="row minus"><span class="sign">−</span><div><h3>What never happens</h3><p>No stub before the first read in a session. No stub for tiny outputs. No stubbed images, errors, or directories. The benchmark found <strong>zero</strong> re-fetch side-effects — models trust the stub and move on.</p></div></div>
+  </div>
+</section>
+
+<!-- ============ BENCH ============ -->
+<section id="bench" data-line="42">
+  <span class="hunk">@@ -42,11 +42,11 @@</span>
+  <h2>Measured, not <em>vibes.</em></h2>
+  <p class="lede">72-run A/B benchmark — 3 opencode free-tier models × 4 scenarios × 3 repetitions, fresh sessions, identical prompts, GFC on vs parked. All attempts counted, no outlier removal. Harness ships in <a href="https://github.com/jjjebli/gfc/tree/master/bench" target="_blank" rel="noopener">bench/</a>.</p>
+  <div class="tblwrap rv">
+  <table class="bench">
+    <thead><tr><th>scenario</th><th>model</th><th>per-turn context A → B</th><th>delta</th></tr></thead>
+    <tbody>
+      <tr><td>re-read 2000-line file</td><td>nemotron-3-ultra</td><td class="m">66,230 → 43,410</td><td class="d">−34%</td></tr>
+      <tr><td>edit + re-read</td><td>nemotron-3-ultra</td><td class="m">66,392 → 43,597</td><td class="d">−34%</td></tr>
+      <tr><td>re-read 2000-line file</td><td>ling-3.1-flash</td><td class="m">58,702 → 43,521</td><td class="d">−26%</td></tr>
+      <tr><td>re-read 2000-line file</td><td>step-5-preview</td><td class="m">44,839 → 34,908</td><td class="d">−22%</td></tr>
+      <tr><td>small file / first read</td><td>all three</td><td class="m">unchanged</td><td class="d">0% by design</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="footnote">mechanism fired 9/9 in every valid run · comprehension after a stub: 100% · zero re-fetch side-effects ·
+  free-tier prompt caching is nondeterministic — benchmark with per-turn context totals, not raw input sums.
+  honesty notes in the README.</p>
+</section>
+
+<!-- ============ INSTALL ============ -->
+<section id="install" data-line="58">
+  <span class="hunk">@@ -58,9 +58,9 @@</span>
+  <h2>Install in <em>two commands.</em></h2>
+  <div class="panels">
+    <div class="panel rv">
+      <span class="tag">opencode · hard interception</span>
+      <h3>OpenCode plugin</h3>
+      <p class="sub">Hooks the read tool. Automatic, invisible, enforced.</p>
+      <pre class="copyable">git clone https://github.com/jjjebli/gfc ~/.gfc
+cp ~/.gfc/gfc-plugin.ts ~/.config/opencode/plugins/gfc.ts</pre>
+      <p class="after"><b>Then restart opencode.</b> Nothing to configure — you'll see <code>[gfc]</code> stubs where duplicates used to be. A symlink instead of the copy makes <b>git pull</b> your update path.</p>
+    </div>
+    <div class="panel rv d1">
+      <span class="tag">codex · any mcp client · advisory</span>
+      <h3>MCP server</h3>
+      <p class="sub">Adds a <code>gfc_read</code> tool your agent is instructed to prefer.</p>
+      <pre class="copyable"># ~/.codex/config.toml
+[mcp_servers.gfc]
+command = "node"
+args = ["/Users/you/.gfc/mcp.mjs"]</pre>
+      <p class="after"><b>Interactive Codex:</b> approve <code>gfc_read</code> once — always allow. <b>codex exec:</b> add <code>--approve-for-me</code>. Recommended rule for <code>~/.codex/AGENTS.md</code>: prefer <code>gfc_read</code> over cat/head/sed/tail.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ KNOBS ============ -->
+<section id="knobs" data-line="71">
+  <span class="hunk">@@ -71,6 +71,6 @@</span>
+  <h2>Knobs, all <em>one.</em></h2>
+  <div class="knobs">
+    <div class="knob"><span class="k">GFC_HOME=/dir</span><span class="v">Relocate all state — and isolate benchmarks or parallel installs.</span></div>
+    <div class="knob"><span class="k">GFC_DEBUG=1</span><span class="v">Trace every hook decision to <code>~/.gfc/debug.log</code>.</span></div>
+    <div class="knob"><span class="k">rm -rf ~/.gfc</span><span class="v">Full reset. Rebuilds itself on the next read; costs one full read per file. It's a cache — treat it like one.</span></div>
+    <div class="knob"><span class="k">tests</span><span class="v"><code>GFC_HOME=$(mktemp -d) node ~/.gfc/core.mjs</code> and <code>node ~/.gfc/test.mjs</code> — deterministic, no LLM, no network.</span></div>
+  </div>
+</section>
+
+<!-- ============ LIMITS ============ -->
+<section id="limits" data-line="82">
+  <span class="hunk">@@ -82,8 +82,8 @@</span>
+  <h2>Known <em>ceilings.</em></h2>
+  <p class="lede">Stated up front, because a token-saving tool that oversells is a token-wasting tool.</p>
+  <ul class="limits rv">
+    <li><span><b>Diffs are single-hunk.</b> Scattered edits fall back to full content when the diff would be larger. Myers upgrade only when that measurably hurts.</span></li>
+    <li><span><b>Files >512KB are never diffed</b> — full re-read on change. Binary files are rejected outright by the MCP tool.</span></li>
+    <li><span><b>The OpenCode hook</b> relies on <code>tool.execute.after</code> output mutation, verified on opencode 1.18.29. If a future version stops persisting it, the fallback is <code>experimental.chat.messages.transform</code> as a send-time rewriter.</span></li>
+    <li><span><b>No savings without re-reads.</b> If your model reads a file once and never looks back, gfc does nothing — by design, it costs nothing too.</span></li>
+  </ul>
+</section>
+
+<footer>
+  <div class="eof">(End of file — total 8 sections · sha256 of this page's honesty: verified)</div>
+  <div class="cols">
+    <a href="https://github.com/jjjebli/gfc" target="_blank" rel="noopener">github.com/jjjebli/gfc</a>
+    <a href="https://github.com/jjjebli/gfc/blob/master/README.md" target="_blank" rel="noopener">readme</a>
+    <a href="https://github.com/jjjebli/gfc/blob/master/LICENSE" target="_blank" rel="noopener">MIT license</a>
+    <span class="sig">built by Soufiane Bahij · the transcript is a diff, not a replay</span>
+  </div>
+</footer>
+
+</main>
+
+<script>
+/* ---------- token counter ---------- */
+const tokEl = document.getElementById("tok");
+const savedEl = document.getElementById("saved");
+let tokCur = 1842, tokTo = 1842;
+function tick(){
+  if (Math.abs(tokTo - tokCur) < 1){ tokCur = tokTo; }
+  else { tokCur += (tokTo - tokCur) * 0.14; requestAnimationFrame(tick); }
+  tokEl.textContent = Math.round(tokCur).toLocaleString("en-US");
+  if (tokCur !== tokTo) requestAnimationFrame(tick);
+}
+function setTok(n){ tokTo = n; requestAnimationFrame(tick); }
+function flashSaved(txt){ savedEl.textContent = txt; savedEl.classList.add("on"); }
+
+/* ---------- demo terminal ---------- */
+const body = document.getElementById("term-body");
+const b1 = document.getElementById("b1"), b2 = document.getElementById("b2"),
+      b3 = document.getElementById("b3"), b0 = document.getElementById("b0");
+const L = (n, cls, txt) => `<span class="tl ${cls}"><span class="ln">${n}</span>${txt}</span>`;
+const NOSHOW = (txt) => `<span class="tl trunc">${txt}</span>`;
+
+const lines = [
+  "import { serve } from \"@hono/node-server\"",
+  "import { auth, session } from \"./auth\"",
+  "import { db } from \"./db\"",
+  "",
+  "const PORT = Number(process.env.PORT ?? 3000)",
+  "const app = new Hono()",
+  "",
+  "app.get(\"/health\", (c) => c.json({ ok: true }))",
+  "",
+  "app.post(\"/session\", async (c) => {",
+  "  const user = await auth(c.req)",
+  "  if (!user) return c.json({ err: \"unauthorized\" }, 401)",
+  "  const s = await db.sessions.create({ userId: user.id })",
+  "  return c.json({ id: s.id })",
+  "})",
+  "",
+  "app.get(\"/session/:id\", async (c) => {",
+  "  const s = await db.sessions.find(c.req.param(\"id\"))",
+  "  if (!s) return c.notFound()",
+  "  return c.json(session.public(s))",
+  "})",
+  "",
+  "// retry policy for flaky upstreams",
+  "const retries = 3",
+  "",
+  "async function withRetry<T>(fn: () => Promise<T>): Promise<T> {",
+  "  for (let i = 0; i < retries; i++) {",
+  "    try { return await fn() }",
+  "    catch (e) { if (i === retries - 1) throw e }",
+  "  }",
+  "  throw new Error(\"unreachable\")",
+  "}",
+  "",
+  "app.post(\"/sync\", async (c) => {",
+  "  const out = await withRetry(() => fetch(UPSTREAM))",
+  "  return c.text(await out.text())",
+  "})",
+  "",
+  "serve({ fetch: app.fetch, port: PORT })",
+  "console.log(`listening on :${PORT}`)",
+];
+
+const state0 = `<span class="tl c">// the model reads, re-reads, edits — watch the meter.</span>
+<span class="tl c">→ press <span class="mono">read</span> to begin.</span>`;
+
+function state1(){
+  let h = `<span class="tl c"><path>/Users/you/src/server.ts</path></span>\n`;
+  h += `<span class="tl c"><type>file</type></span>\n`;
+  for (let i = 0; i < 8; i++) h += L(i+1, "ok", esc(lines[i]));
+  h += NOSHOW("   ··· lines 9–38 (30 lines) ···");
+  for (let i = 38; i < lines.length; i++) h += L(i+1, "ok", esc(lines[i]));
+  h += `<span class="tl c">(End of file — total 47 lines · 6,412 tokens entering context)</span>`;
+  return h;
+}
+function esc(s){ return s.replace(/&/g,"&"+"amp;").replace(/</g,"&"+"lt;").replace(/>/g,"&"+"gt;"); }
+
+const state2 = `<span class="tl stub">[gfc] unchanged: "/Users/you/src/server.ts" is byte-identical to the</span>
+<span class="tl stub">full content already present earlier in this conversation</span>
+<span class="tl stub">(sha256 77ed7fe0c7ed, 47 lines, 1.6 KB). Nothing new to show —</span>
+<span class="tl stub">use read with offset/limit if you need specific lines again.</span>
+<span class="tl c">(51 tokens · the 6,412-token duplicate never happened)</span>`;
+
+function state3(){
+  let h = `<span class="tl stub">[gfc] changed since the full version earlier in this conversation</span>
+<span class="tl stub">(77ed7fe0c7ed → 8f839ca60d0b). Diff of last-seen → current:</span>
+<span class="tl h">@@ -28,7 +28,7 @@</span>
+`;
+  for (let i = 25; i < 28; i++) h += L(i+1, "c", esc(lines[i]));
+  h += L(28, "r", "- " + esc(lines[27]));
+  h += L(28, "g", "+ const retries = 5   // raised for flaky upstreams");
+  for (let i = 28; i < 31; i++) h += L(i+2, "c", esc(lines[i]));
+  h += `<span class="tl c">(168 tokens · full re-read would be 6,412)</span>`;
+  return h;
+}
+
+function swap(html){
+  body.style.opacity = 0;
+  setTimeout(() => { body.innerHTML = html; body.style.transition = "opacity .35s"; body.style.opacity = 1; }, 180);
+}
+function active(x){ [b1,b2,b3].forEach(b=>b.classList.remove("active")); if(x) x.classList.add("active"); }
+
+b1.onclick = () => { swap(state1()); setTok(8254); savedEl.classList.remove("on"); active(b1); b2.disabled = false; b0.disabled = false; };
+b2.onclick = () => { swap(state2); setTok(1893); flashSaved("−6,361 tokens"); active(b2); b3.disabled = false; };
+b3.onclick = () => { swap(state3()); setTok(2001); flashSaved("−6,253 tokens"); active(b3); };
+b0.onclick = () => { swap(state0); setTok(1842); savedEl.classList.remove("on"); active(null); b2.disabled = b3.disabled = true; b0.disabled = true; };
+
+/* ---------- copy ---------- */
+const cmd = document.getElementById("cpcmd");
+cmd.addEventListener("click", () => {
+  navigator.clipboard.writeText("git clone https://github.com/jjjebli/gfc ~/.gfc").then(() => {
+    cmd.classList.add("copied");
+    setTimeout(() => cmd.classList.remove("copied"), 1400);
+  });
+});
+document.querySelectorAll(".panel pre.copyable").forEach(pre => {
+  pre.addEventListener("click", () => {
+    navigator.clipboard.writeText(pre.innerText).then(() => {
+      pre.style.borderColor = "var(--green)";
+      setTimeout(() => pre.style.borderColor = "", 900);
+    });
+  });
+});
+
+/* ---------- reveals ---------- */
+const io = new IntersectionObserver((es) => {
+  es.forEach(e => { if (e.isIntersecting){ e.target.classList.add("in"); io.unobserve(e.target); } });
+}, { threshold: 0.08 });
+document.querySelectorAll(".rv").forEach(el => io.observe(el));
+window.addEventListener("load", () => {
+  document.querySelectorAll(".hero .rv").forEach(el => el.classList.add("in"));
+});
+</script>
+</body>
+</html>

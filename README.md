@@ -1,5 +1,9 @@
 # gfc — git-for-context
 
+<p align="center"><img src="docs/banner.svg" alt="gfc — git-for-context" width="720"></p>
+
+**Docs site: https://jjjebli.github.io/gfc/** — the interactive version, with a live demo of a stub replacing a full re-read.
+
 LLM coding agents re-read the same files over and over. The transcript is a
 linear replay: every turn re-pays for content the model has already seen.
 gfc (git-for-context) treats the transcript like git treats a working tree —
