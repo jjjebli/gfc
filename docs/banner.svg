@@ -1,33 +1,49 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 300" font-family="Georgia, 'Times New Roman', serif">
-  <rect width="1280" height="300" fill="#0A0A0A"/>
-  <rect x="0" y="0" width="1280" height="1" fill="#262626"/>
-  <rect x="0" y="299" width="1280" height="1" fill="#262626"/>
-  <!-- logomark -->
-  <g transform="translate(56,66)">
-    <rect x="0" y="0" width="168" height="168" rx="38" fill="#050505" stroke="#262626" stroke-width="2"/>
-    <g stroke="#EDEDED" stroke-width="17" stroke-linecap="round">
-      <line x1="66" y1="42" x2="66" y2="84"/>
-      <line x1="45" y1="63" x2="87" y2="63"/>
-    </g>
-    <g stroke="#787878" stroke-width="17" stroke-linecap="round">
-      <line x1="97" y1="118" x2="129" y2="118"/>
-    </g>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 300" role="img" aria-labelledby="GFC-title">
+  <title id="GFC-title">GFC, git-for-context: unchanged files cost nothing, changes ship as diffs</title>
+  <rect width="1280" height="300" fill="#000000"/>
+
+  <!-- mark: "+=", the new state added to what the model already holds -->
+  <g transform="translate(72,66)">
+    <rect width="168" height="168" rx="40" fill="#111111" stroke="#242424" stroke-width="2"/>
+    <path d="M57 56V112M29 84H85" stroke="#EDEDED" stroke-width="14" stroke-linecap="round"/>
+    <path d="M108 76H142M108 92H142" stroke="#5C5C5C" stroke-width="10" stroke-linecap="round"/>
   </g>
+
   <!-- wordmark -->
-  <text x="290" y="140" font-size="96" fill="#EDEDED" font-style="italic">gfc</text>
-  <text x="296" y="188" font-size="30" fill="#8A8A8A" font-family="'Courier New', monospace">git-for-context</text>
-  <!-- stub line -->
-  <g font-family="'Courier New', monospace" font-size="21">
-    <text x="290" y="242" fill="#C9C9C9">[gfc] unchanged: byte-identical to your last full read</text>
-    <text x="290" y="270" fill="#6E6E6E">(sha256 77ed7fe0c7ed, 47 lines, 2.5 KB) — nothing new to show</text>
+  <text x="280" y="136" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="104" font-weight="700" letter-spacing="-4" fill="#EDEDED">GFC</text>
+  <text x="280" y="178" font-family="'JetBrains Mono', 'SF Mono', Menlo, Consolas, 'DejaVu Sans Mono', monospace" font-size="20" fill="#8C8C8C">git-for-context</text>
+
+  <!-- stub: what the model gets back on an unchanged read -->
+  <g font-family="'JetBrains Mono', 'SF Mono', Menlo, Consolas, 'DejaVu Sans Mono', monospace" font-size="15">
+    <text x="280" y="216" fill="#D4D4D4">[GFC] unchanged: byte-identical to last read</text>
+    <text x="280" y="238" fill="#6E6E6E">sha256 77ed7fe0c7ed, 47 lines, 2.5 KB</text>
   </g>
-  <!-- diff hunk, right -->
-  <g font-family="'Courier New', monospace" font-size="21">
-    <text x="1010" y="96" fill="#9A9A9A">@@ -31,7 +31,7 @@</text>
-    <text x="1010" y="126" fill="#8A8A8A">  const session = auth(req)</text>
-    <text x="1010" y="156" fill="#787878">- const retries = 3</text>
-    <text x="1010" y="186" fill="#EDEDED">+ const retries = 5</text>
-    <text x="1010" y="216" fill="#8A8A8A">  return handler(session)</text>
+
+  <!-- diff card: the hero -->
+  <g transform="translate(760,42)" font-family="'JetBrains Mono', 'SF Mono', Menlo, Consolas, 'DejaVu Sans Mono', monospace">
+    <rect width="448" height="216" rx="14" fill="#0E0E0E" stroke="#242424"/>
+
+    <text x="24" y="25" font-size="14" fill="#8C8C8C">src/server.ts</text>
+    <text x="424" y="25" font-size="14" text-anchor="end" fill="#9BE7B9">−34% context per turn</text>
+    <line x1="1" y1="40" x2="447" y2="40" stroke="#1F1F1F"/>
+
+    <rect x="1" y="50" width="446" height="28" fill="#121A27"/>
+    <text x="24" y="69" font-size="14" fill="#7F9FD6">@@ -32,3 +32,3 @@</text>
+
+    <text x="24" y="98" font-size="14" fill="#5A5A5A">32</text>
+    <text x="70" y="98" font-size="16" fill="#8F8F8F">const session = auth(req)</text>
+
+    <rect x="1" y="108" width="446" height="30" fill="#2A1315"/>
+    <text x="24" y="128" font-size="14" fill="#7A5256">33</text>
+    <text x="52" y="128" font-size="16" fill="#FF8C82">-</text>
+    <text x="70" y="128" font-size="16" fill="#FFA69E">const retries = <tspan font-weight="700" fill="#FFD2CC">3</tspan></text>
+
+    <rect x="1" y="138" width="446" height="30" fill="#12271B"/>
+    <text x="24" y="158" font-size="14" fill="#4E7F62">33</text>
+    <text x="52" y="158" font-size="16" fill="#7EE2A8">+</text>
+    <text x="70" y="158" font-size="16" fill="#A8F0C2">const retries = <tspan font-weight="700" fill="#D6FBE5">5</tspan></text>
+
+    <text x="24" y="188" font-size="14" fill="#5A5A5A">34</text>
+    <text x="70" y="188" font-size="16" fill="#8F8F8F">return handler(session)</text>
   </g>
-  <text x="1010" y="264" font-family="'Courier New', monospace" font-size="19" fill="#6E6E6E">−34% context per turn</text>
 </svg>

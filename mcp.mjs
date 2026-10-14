@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// gfc MCP server — git-for-context (GFC) over the Model Context Protocol.
+// GFC MCP server — git-for-context over the Model Context Protocol.
 //
 // One tool: gfc_read. Same registry/blob store and session-scoping semantics
 // as the OpenCode plugin (~/.config/opencode/plugins/gfc.ts imports the same
@@ -80,7 +80,7 @@ function gfcRead(args) {
       `(Showing lines ${from}-${to} of ${total}. Use offset=${to + 1} to continue.)`;
     if (known && prev.hash !== hash) {
       text =
-        `[gfc] note: file changed since the full version you saw earlier in this conversation ` +
+        `[GFC] note: file changed since the full version you saw earlier in this conversation ` +
         `(${prev.hash.slice(0, 12)} → ${hash.slice(0, 12)}). Lines below are the CURRENT content:\n${text}`;
     }
     // Registry stays untouched: partial slices never count as "seen".
@@ -93,7 +93,7 @@ function gfcRead(args) {
     if (fullText.length >= core.MIN_STUB) {
       put();
       return (
-        `[gfc] unchanged: "${real}" is byte-identical to the full content already present earlier in ` +
+        `[GFC] unchanged: "${real}" is byte-identical to the full content already present earlier in ` +
         `this conversation (sha256 ${hash.slice(0, 12)}, ${total} lines, ${core.fmtKB(stat.size)}). Nothing new to show — ` +
         `use gfc_read with offset/limit for specific lines.`
       );
@@ -110,14 +110,14 @@ function gfcRead(args) {
         core.saveBlob(hash, content, stat.size);
         put();
         return (
-          `[gfc] changed since the full version earlier in this conversation (${prev.hash.slice(0, 12)} → ${hash.slice(0, 12)}). ` +
+          `[GFC] changed since the full version earlier in this conversation (${prev.hash.slice(0, 12)} → ${hash.slice(0, 12)}). ` +
           `Diff of last-seen → current (file now has ${total} lines; use gfc_read with offset/limit for any region):\n${diff}`
         );
       }
     }
     core.saveBlob(hash, content, stat.size);
     put();
-    return `[gfc] note: file changed since the full version earlier in this conversation. Full current content:\n${fullText}`;
+    return `[GFC] note: file changed since the full version earlier in this conversation. Full current content:\n${fullText}`;
   }
 
   // First full read in this server's session.
@@ -134,7 +134,7 @@ const TOOLS = [
   {
     name: "gfc_read",
     description:
-      "Read a file with git-for-context dedup: re-reading an unchanged file returns a short [gfc] stub, and a changed file returns a diff vs what you last saw. Prefer this over cat/head/sed/tail for reading files. Returns 1-based numbered lines.",
+      "Read a file with git-for-context dedup: re-reading an unchanged file returns a short [GFC] stub, and a changed file returns a diff vs what you last saw. Prefer this over cat/head/sed/tail for reading files. Returns 1-based numbered lines.",
     inputSchema: {
       type: "object",
       properties: {
@@ -158,7 +158,7 @@ const methods = {
   initialize: (id, params) => {
     const requested = params?.protocolVersion;
     const version = SUPPORTED.includes(requested) ? requested : SUPPORTED[0];
-    respond(id, { protocolVersion: version, capabilities: { tools: {} }, serverInfo: { name: "gfc", version: "1.0.0" } });
+    respond(id, { protocolVersion: version, capabilities: { tools: {} }, serverInfo: { name: "GFC", version: "1.0.0" } });
   },
   ping: (id) => respond(id, {}),
   "tools/list": (id) => respond(id, { tools: TOOLS }),

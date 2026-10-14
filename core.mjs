@@ -1,4 +1,4 @@
-// gfc core — git-for-context (GFC) shared logic. Registry v2.
+// GFC core — git-for-context shared logic. Registry v2.
 //
 // Single source of truth for the on-disk contract used by BOTH the OpenCode
 // plugin (~/.config/opencode/plugins/gfc.ts) and the MCP server (~/.gfc/mcp.mjs):
@@ -10,7 +10,7 @@
 // "seen" is SESSION-SCOPED: models are stateless, so the first full read in
 // any session always returns real content. Entries are nested per-session —
 // parallel sessions on the same file no longer clobber each other (v1 bug,
-// measured during the gfc-bench matrix).
+// measured during the GFC-bench matrix).
 //
 // Write safety: atomic rename + cross-process lockfile around the
 // read-modify-write. ponytail: on 3s lock timeout we proceed unlocked
@@ -254,8 +254,8 @@ if (import.meta.main) {
       assert(getEntry(after, "child1", `/race/1/${n}`), `child1 /race/1/${n} lost`);
     }
     assert(getEntry(after, "child0", "/race/shared") || getEntry(after, "child1", "/race/shared"));
-    console.log("gfc core self-test: all assertions passed (incl. registry v2 round-trip, cross-process lock race)");
+    console.log("GFC core self-test: all assertions passed (incl. registry v2 round-trip, cross-process lock race)");
   } else {
-    console.log("gfc core self-test: pure assertions passed (set GFC_HOME to include registry tests)");
+    console.log("GFC core self-test: pure assertions passed (set GFC_HOME to include registry tests)");
   }
 }

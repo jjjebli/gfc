@@ -1,10 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect width="64" height="64" rx="13" fill="#0A0A0A"/>
-  <g stroke="#EDEDED" stroke-width="6.5" stroke-linecap="round">
-    <line x1="25" y1="16" x2="25" y2="32"/>
-    <line x1="17" y1="24" x2="33" y2="24"/>
-  </g>
-  <g stroke="#787878" stroke-width="6.5" stroke-linecap="round">
-    <line x1="37" y1="43" x2="49" y2="43"/>
-  </g>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 168 168">
+  <rect width="168" height="168" rx="40" fill="#111111" stroke="#2A2A2A" stroke-width="4"/>
+  <path d="M57 56V112M29 84H85" stroke="#EDEDED" stroke-width="14" stroke-linecap="round"/>
+  <path d="M108 76H142M108 92H142" stroke="#5C5C5C" stroke-width="10" stroke-linecap="round"/>
 </svg>

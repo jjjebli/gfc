@@ -1,6 +1,6 @@
-# gfc — git-for-context
+# GFC — git-for-context
 
-<p align="center"><img src="docs/banner.svg" alt="gfc — git-for-context" width="720"></p>
+<p align="center"><img src="docs/banner.svg" alt="GFC — git-for-context" width="720"></p>
 
 <p align="center">
   <a href="https://github.com/jjjebli/gfc/actions/workflows/ci.yml"><img src="https://github.com/jjjebli/gfc/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
@@ -10,17 +10,17 @@
   <img src="https://img.shields.io/badge/license-MIT-111413?style=flat-square" alt="MIT">
 </p>
 
-**Docs site: https://jjjebli.github.io/gfc/** — the interactive version, where the page itself is a numbered file being read, with a live demo of a stub replacing a full re-read.
+**Docs site: https://jjjebli.github.io/gfc/** — the interactive version: scrolly chapters that walk the mechanism, an A/B read simulator (with vs without GFC), and animated benchmark bars.
 
 LLM coding agents re-read the same files over and over. The transcript is a
 linear replay: every turn re-pays for content the model has already seen.
-**gfc treats the transcript like git treats a working tree — ship the model a
+**GFC treats the transcript like git treats a working tree — ship the model a
 diff against what it already saw, never a full re-checkout.**
 
 | What the model does | What it gets |
 |---|---|
 | First full read of a file | Full numbered content (always) |
-| Re-reads an **unchanged** file | A tiny `[gfc] unchanged` stub (~45 tokens, hash-verifiable) |
+| Re-reads an **unchanged** file | A tiny `[GFC] unchanged` stub (~45 tokens, hash-verifiable) |
 | Re-reads a **changed** file | A unified diff of last-seen → current |
 | Reads a slice (offset/limit) | The real lines — plus a change-note if the file drifted |
 
@@ -47,7 +47,7 @@ re-fetch side-effects). Registry writes are cross-process safe (lockfile +
 atomic rename; verified by a 2-process race test — 60/60 entries survive).
 
 The win scales with the size of your files and how often the agent re-reads
-them. A 2000-line file re-read twice costs ~3× in tokens; with gfc it costs
+them. A 2000-line file re-read twice costs ~3× in tokens; with GFC it costs
 ~1.05×.
 
 ## Install
@@ -74,16 +74,16 @@ Restart opencode. Done — there is nothing to configure.
 Add to `~/.codex/config.toml`:
 
 ```toml
-[mcp_servers.gfc]
+[mcp_servers.GFC]
 command = "node"
-args = ["/Users/you/.gfc/mcp.mjs"]
+args = ["/Users/you/.GFC/mcp.mjs"]
 ```
 
 Recommended rule for `~/.codex/AGENTS.md`:
 
 ```md
 When reading files, prefer the `gfc_read` MCP tool over cat/head/sed/tail.
-A `[gfc]` stub means "unchanged since your last full read" — trust it.
+A `[GFC]` stub means "unchanged since your last full read" — trust it.
 ```
 
 Interactive Codex will ask to approve the tool once — choose *always allow*.
@@ -140,4 +140,4 @@ MIT
 
 ---
 
-If gfc cut your context bills, a ⭐ helps other agents' humans find it.
+If GFC cut your context bills, a ⭐ helps other agents' humans find it.

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// gfc test.mjs — deterministic MCP-stack battery (no LLM involved).
+// GFC test.mjs — deterministic MCP-stack battery (no LLM involved).
 // Covers: stub, diff, partial slice, change-note, empty/missing/binary/
 // oversize files, cross-process registry race. Isolated via GFC_HOME.
 import { spawn } from "node:child_process";
@@ -69,17 +69,17 @@ const main = async () => {
   const t1 = await s.read({ path: file });
   assert.ok(t1.startsWith("<path>") && t1.includes("300: line 0300"), "first read = full numbered dump");
   const t2 = await s.read({ path: file });
-  assert.ok(t2.includes("[gfc] unchanged"), "re-read = stub");
+  assert.ok(t2.includes("[GFC] unchanged"), "re-read = stub");
   assert.ok(t2.length < 400, "stub is tiny");
 
   const t3 = await s.read({ path: file, offset: 100, limit: 5 });
-  assert.ok(t3.includes("100: line 0100") && !t3.includes("[gfc]"), "partial = clean slice");
+  assert.ok(t3.includes("100: line 0100") && !t3.includes("[GFC]"), "partial = clean slice");
 
   fs.writeFileSync(file, lines(300).replace("line 0150", "line 0150 X"));
   const t5 = await s.read({ path: file, offset: 100, limit: 5 });
-  assert.ok(t5.startsWith("[gfc] note: file changed"), "partial before the change is seen = note + slice");
+  assert.ok(t5.startsWith("[GFC] note: file changed"), "partial before the change is seen = note + slice");
   const t4 = await s.read({ path: file });
-  assert.ok(t4.includes("[gfc] changed") && t4.includes("- line 0150") && t4.includes("+ line 0150 X"), "changed = diff");
+  assert.ok(t4.includes("[GFC] changed") && t4.includes("- line 0150") && t4.includes("+ line 0150 X"), "changed = diff");
   assert.ok(t4.length < t1.length, "diff smaller than full");
 
   // --- edges
@@ -88,7 +88,7 @@ const main = async () => {
   const t6 = await s.read({ path: empty });
   assert.ok(t6.includes("total 0 lines"), "empty file reads cleanly");
   const t7 = await s.read({ path: empty });
-  assert.ok(!t7.includes("[gfc] unchanged"), "tiny file never stubs (MIN_STUB)");
+  assert.ok(!t7.includes("[GFC] unchanged"), "tiny file never stubs (MIN_STUB)");
 
   const t8 = await s.read({ path: path.join(FX, "nope.txt") });
   assert.ok(t8.startsWith("__ERROR__"), "missing file = error");
@@ -107,10 +107,10 @@ const main = async () => {
   assert.ok(t10.includes("50000: line 50000"), "oversize first read = full");
   fs.writeFileSync(big, lines(50000).replace("line 7000\n", "line 7000 Y\n"));
   const t11 = await s.read({ path: big });
-  assert.ok(t11.includes("[gfc] note: file changed") && t11.includes("Full current content"), "oversize change = full + note (no blob diff)");
+  assert.ok(t11.includes("[GFC] note: file changed") && t11.includes("Full current content"), "oversize change = full + note (no blob diff)");
   s.kill();
 
-  console.log("gfc mcp battery: ALL PASSED");
+  console.log("GFC mcp battery: ALL PASSED");
   console.log(`  isolated state: ${GFC}`);
   fs.rmSync(GFC, { recursive: true, force: true });
   fs.rmSync(FX, { recursive: true, force: true });

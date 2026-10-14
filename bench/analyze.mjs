@@ -33,9 +33,9 @@ function parseRun(file) {
       const out = p.state?.output || "";
       if (p.tool === "read") {
         m.read_calls++;
-        if (out.includes("[gfc] unchanged")) m.stubs++;
-        if (out.includes("[gfc] changed")) m.diffs++;
-        if (out.includes("[gfc] note")) m.notes++;
+        if (out.includes("[GFC] unchanged")) m.stubs++;
+        if (out.includes("[GFC] changed")) m.diffs++;
+        if (out.includes("[GFC] note")) m.notes++;
       } else m.other_tool_calls++;
     } else if (t === "text") {
       m.final_text = d.part?.text || "";

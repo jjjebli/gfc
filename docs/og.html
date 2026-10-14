@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<style>
+  html,body{margin:0;padding:0}
+  .card{position:relative;width:1200px;height:630px;background:#000;
+        border-top:1px solid #1F1F1F;border-bottom:1px solid #1F1F1F;overflow:hidden;
+        font-family:Inter,"Segoe UI",system-ui,-apple-system,Helvetica,Arial,sans-serif}
+  .mono{font-family:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  .tile{position:absolute;left:80px;top:88px;width:170px;height:170px}
+  .wordmark{position:absolute;left:300px;top:86px;font-weight:700;font-size:100px;
+            line-height:1;color:#EDEDED;letter-spacing:-.04em}
+  .wordsub{position:absolute;left:304px;top:206px;font-size:24px;color:#8C8C8C}
+  .tagline{position:absolute;left:80px;top:330px;font-weight:600;font-size:42px;
+           color:#D4D4D4;letter-spacing:-.02em}
+  .stub{position:absolute;left:80px;top:420px;font-size:22px;color:#9A9A9A;white-space:nowrap}
+  .stub b{color:#EDEDED;font-weight:700}
+  .diffcard{position:absolute;right:80px;top:64px;width:470px;background:#0E0E0E;
+            border:1px solid #242424;border-radius:14px;overflow:hidden}
+  .diffhead{display:flex;justify-content:space-between;padding:14px 20px 12px;
+            border-bottom:1px solid #1F1F1F;font-size:15px}
+  .diffhead .fn{color:#8C8C8C}
+  .diffhead .pct{color:#9BE7B9}
+  .dl{display:block;white-space:pre;padding:6px 20px;font-size:17px;line-height:1.5}
+  .dl.hunk{background:#121A27;color:#7F9FD6;font-size:15px}
+  .dl.ctx{color:#8F8F8F}
+  .dl.del{background:#2A1315;color:#FFA69E}
+  .dl.add{background:#12271B;color:#A8F0C2}
+  .dl b{font-weight:700}
+  .repo{position:absolute;right:80px;bottom:44px;font-size:20px;color:#5A5A5A}
+  .facts{position:absolute;left:80px;bottom:44px;font-size:17px;color:#5A5A5A}
+</style>
+</head>
+<body>
+<div class="card">
+  <svg class="tile" viewBox="0 0 168 168">
+    <rect width="168" height="168" rx="40" fill="#111111" stroke="#2A2A2A" stroke-width="4"/>
+    <path d="M57 56V112M29 84H85" stroke="#EDEDED" stroke-width="14" stroke-linecap="round"/>
+    <path d="M108 76H142M108 92H142" stroke="#5C5C5C" stroke-width="10" stroke-linecap="round"/>
+  </svg>
+  <div class="wordmark">GFC</div>
+  <div class="wordsub mono">git-for-context</div>
+  <div class="tagline">Stop paying for files<br>your model already read.</div>
+  <div class="stub mono"><b>[GFC]</b> unchanged: byte-identical to your last full read — nothing new to show</div>
+  <div class="facts mono">MIT · zero dependencies · OpenCode plugin + MCP server</div>
+  <div class="repo mono">github.com/jjjebli/gfc</div>
+  <div class="diffcard mono">
+    <div class="diffhead"><span class="fn">src/server.ts</span><span class="pct">−34% context per turn</span></div>
+    <div class="dl hunk">@@ -32,3 +32,3 @@</div>
+    <div class="dl ctx">  const session = auth(req)</div>
+    <div class="dl del">- const retries = <b>3</b></div>
+    <div class="dl add">+ const retries = <b>5</b></div>
+    <div class="dl ctx">  return handler(session)</div>
+  </div>
+</div>
+</body>
+</html>

@@ -1,4 +1,4 @@
-// gfc — git-for-context (GFC) for OpenCode.
+// GFC — git-for-context for OpenCode.
 //
 // Problem: the transcript is a linear replay. Re-reading an unchanged file
 // re-pays the same tokens every turn. This plugin intercepts read-tool
@@ -102,7 +102,7 @@ function interceptRead(input: any, output: any) {
     // Registry stays untouched: partial slices never count as "seen".
     if (known && prev!.hash !== hash) {
       output.output =
-        `[gfc] note: file changed since the full version you saw earlier in this conversation ` +
+        `[GFC] note: file changed since the full version you saw earlier in this conversation ` +
         `(${prev!.hash.slice(0, 12)} → ${hash.slice(0, 12)}). Lines below are the CURRENT content:\n${text}`;
     }
     return;
@@ -111,7 +111,7 @@ function interceptRead(input: any, output: any) {
   if (known && prev!.hash === hash && text.length >= core.MIN_STUB) {
     put();
     output.output =
-      `[gfc] unchanged: "${real}" is byte-identical to the full content already present earlier in ` +
+      `[GFC] unchanged: "${real}" is byte-identical to the full content already present earlier in ` +
       `this conversation (sha256 ${hash.slice(0, 12)}, ${total} lines, ${core.fmtKB(stat.size)}). Nothing new to show — ` +
       `use read with offset/limit if you need specific lines again.`;
     return;
@@ -125,7 +125,7 @@ function interceptRead(input: any, output: any) {
         core.saveBlob(hash, content, stat.size);
         put();
         output.output =
-          `[gfc] changed since the full version earlier in this conversation (${prev!.hash.slice(0, 12)} → ${hash.slice(0, 12)}). ` +
+          `[GFC] changed since the full version earlier in this conversation (${prev!.hash.slice(0, 12)} → ${hash.slice(0, 12)}). ` +
           `Diff of last-seen → current (file now has ${total} lines; use read with offset/limit for any region):\n${diff}`;
         return;
       }
@@ -133,7 +133,7 @@ function interceptRead(input: any, output: any) {
     // No blob, or diff larger than the full text: fall back to full + note.
     core.saveBlob(hash, content, stat.size);
     put();
-    output.output = `[gfc] note: file changed since the full version earlier in this conversation. Full current content:\n${text}`;
+    output.output = `[GFC] note: file changed since the full version earlier in this conversation. Full current content:\n${text}`;
     return;
   }
 
@@ -158,7 +158,7 @@ export default async ({ directory: dir }: { directory?: string } = {}): Promise<
     fs.mkdirSync(core.STORE_DIR, { recursive: true });
     core.gcBlobs();
   } catch (e: any) {
-    console.error(`gfc: failed to load core.mjs — plugin disabled (${e?.message ?? e})`);
+    console.error(`GFC: failed to load core.mjs — plugin disabled (${e?.message ?? e})`);
     return {};
   }
 
@@ -183,7 +183,7 @@ export default async ({ directory: dir }: { directory?: string } = {}): Promise<
         if (DEBUG) debug(`compaction hook: sid=${sid} seen_files=${seen.length} pushed=${seen.length > 0}`);
         if (seen.length === 0) return;
         output.context.push(
-          "[gfc] These files were fully read earlier in this session (sha256 of full content given). " +
+          "[GFC] These files were fully read earlier in this session (sha256 of full content given). " +
             "Do NOT paste their contents into the summary; if a specific region is needed later, " +
             "re-read it with the read tool (offset/limit):\n" +
             seen.map(([p, e]) => `- ${p} (${e.lines} lines, hash ${e.hash.slice(0, 12)})`).join("\n"),

@@ -3,517 +3,800 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>gfc — git-for-context</title>
+<meta name="color-scheme" content="dark">
+<title>GFC — git-for-context</title>
 <meta name="description" content="Stop paying for files your model already read. Hash-verified stubs for unchanged re-reads, diffs for changed files. OpenCode plugin + MCP server, zero dependencies.">
-<meta property="og:title" content="gfc — git-for-context">
+<meta property="og:title" content="GFC — git-for-context">
 <meta property="og:description" content="Stop paying for files your model already read. Measured −22% to −34% context per turn.">
 <meta property="og:image" content="https://jjjebli.github.io/gfc/og.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="gfc — git-for-context">
-<meta name="twitter:description" content="Stop paying for files your model already read. Measured −22% to −34% context per turn.">
-<meta name="twitter:image" content="https://jjjebli.github.io/gfc/og.png">
-<link rel="icon" type="image/svg+xml" href="favicon.svg">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..700;1,9..144,300..700&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:ital,wght@0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
 <style>
 :root{
-  --bg:#0C0E0D; --bg2:#111413; --bg3:#161A18;
-  --ink:#E9E7E0; --dim:#9BA39B; --faint:#5C655D;
-  --green:#52C489; --green-dim:#2E6B4C;
-  --red:#E5544B; --blue:#58A6FF; --amber:#D8A657;
-  --line:#232826; --line2:#2E332F;
-  --mono:"JetBrains Mono",ui-monospace,monospace;
-  --sans:"Instrument Sans",system-ui,sans-serif;
-  --serif:"Fraunces",Georgia,serif;
-  --maxw:1060px; --gutter:76px;
+  --bg:#000;
+  --surface:#0E0E0E;
+  --inset:#080808;
+  --line:#1F1F1F;
+  --line-2:#2A2A2A;
+  --text:#EDEDED;
+  --muted:#A3A3A3;
+  --faint:#6B6B6B;
+  --add:#7EE2A8;   --add-bg:#12271B; --add-ink:#A8F0C2;
+  --del:#FF8C82;   --del-bg:#2A1315; --del-ink:#FFA69E;
+  --hunk:#7F9FD6;  --hunk-bg:#121A27;
+  --gutter:#5A5A5A;
+  --sans:Inter,"Segoe UI",system-ui,-apple-system,Helvetica,Arial,sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,"DejaVu Sans Mono",monospace;
+  --pad:clamp(20px,5vw,56px);
+  --hh:65px;
 }
-*{margin:0;padding:0;box-sizing:border-box}
-html{scroll-behavior:smooth}
-body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:17px;line-height:1.65;-webkit-font-smoothing:antialiased}
-::selection{background:var(--green);color:#08110C}
-a{color:var(--green);text-decoration:none}
-a:hover{text-decoration:underline;text-underline-offset:3px}
-code,.mono{font-family:var(--mono)}
-code{font-size:.86em;background:var(--bg3);border:1px solid var(--line);border-radius:5px;padding:.1em .38em;color:var(--ink);white-space:nowrap}
+*,*::before,*::after{box-sizing:border-box}
+html{background:var(--bg);color:var(--text);scroll-behavior:smooth;scroll-padding-top:88px}
+body{margin:0;font:400 17px/1.6 var(--sans);-webkit-font-smoothing:antialiased}
+a{color:inherit}
+button{font:inherit;color:inherit}
+code{font-family:var(--mono);font-size:.9em;overflow-wrap:anywhere}
+:focus-visible{outline:2px solid var(--hunk);outline-offset:3px;border-radius:4px}
+p,h1,h2,h3{margin:0}
+.wrap{width:calc(100% - 2*var(--pad));max-width:1120px;margin-inline:auto}
+.intro{color:var(--muted);max-width:46ch}
+h2{font-size:clamp(30px,4vw,46px);line-height:1.08;letter-spacing:-0.03em;font-weight:700;margin:0 0 20px;text-wrap:balance}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
 
-/* grain */
-body::after{content:"";position:fixed;inset:0;pointer-events:none;opacity:.05;z-index:999;
-  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E")}
-
-/* nav */
-nav{position:fixed;top:0;left:0;right:0;z-index:50;backdrop-filter:blur(14px);background:rgba(12,14,13,.82);border-bottom:1px solid var(--line)}
-.nav-in{max-width:var(--maxw);margin:0 auto;display:flex;align-items:center;gap:28px;padding:14px 28px}
-.brand{display:flex;align-items:center;gap:11px;color:var(--ink)}
-.brand img{width:26px;height:26px;display:block}
-.brand b{font-family:var(--mono);font-weight:700;font-size:16px;letter-spacing:-.02em}
-.brand i{font-family:var(--serif);font-style:italic;font-weight:400;color:var(--dim);font-size:15px}
-nav .links{display:flex;gap:22px;margin-left:auto;font-family:var(--mono);font-size:13.5px}
-nav .links a{color:var(--dim)}
-nav .links a:hover{color:var(--ink);text-decoration:none}
-nav .links a.gh{color:var(--ink);display:flex;align-items:center;gap:7px}
-nav .links a.gh svg{width:17px;height:17px;fill:currentColor}
-@media(max-width:760px){nav .links a:not(.gh){display:none}}
-
-/* layout */
-main{max-width:var(--maxw);margin:0 auto;padding:0 28px}
-section{position:relative;padding:96px 0 0 var(--gutter);max-width:calc(var(--maxw) - 28px)}
-@media(max-width:760px){section{padding-left:0}
-  section::before{display:none}}
-/* read-tool gutter number */
-section::before{content:attr(data-line) ":";position:absolute;left:6px;top:100px;font-family:var(--mono);font-size:14px;color:var(--faint)}
-/* hunk header kicker */
-.hunk{font-family:var(--mono);font-size:13px;color:var(--blue);letter-spacing:.02em;margin-bottom:14px;display:block}
-h2{font-family:var(--serif);font-weight:500;font-size:clamp(30px,4.4vw,44px);line-height:1.08;letter-spacing:-.01em;margin-bottom:22px}
-h2 em{font-style:italic;color:var(--green)}
-.lede{font-size:clamp(17px,2vw,19px);color:var(--dim);max-width:62ch}
-.lede strong{color:var(--ink);font-weight:500}
-p + p{margin-top:14px}
+/* header + progress */
+.site-header{position:sticky;top:0;z-index:20;height:var(--hh);background:rgba(0,0,0,.88);border-bottom:1px solid var(--line)}
+@supports (backdrop-filter:blur(8px)){.site-header{background:rgba(0,0,0,.7);backdrop-filter:blur(10px)}}
+.bar{height:100%;display:flex;align-items:center;justify-content:space-between;gap:20px}
+.brand{display:inline-flex;align-items:center;gap:10px;text-decoration:none;font-weight:700;font-size:18px;letter-spacing:-0.02em;flex:none}
+.brand svg{display:block}
+.site-nav{display:flex;gap:22px;font-size:15px;min-width:0;overflow-x:auto;scrollbar-width:none}
+.site-nav::-webkit-scrollbar{display:none}
+.site-nav a{color:var(--muted);text-decoration:none;padding:6px 0;white-space:nowrap}
+.site-nav a:hover{color:var(--text)}
+.site-nav a[aria-current="true"]{color:var(--text);box-shadow:inset 0 -2px 0 var(--text)}
+.progress{position:absolute;left:0;right:0;bottom:-1px;height:2px;background:var(--text);transform-origin:0 50%;transform:scaleX(0)}
+@media (max-width:620px){.site-nav{gap:16px;font-size:14px}}
 
 /* hero */
-.hero{min-height:100svh;display:flex;flex-direction:column;justify-content:center;padding-top:130px;padding-left:0}
-.hero h1{font-family:var(--serif);font-weight:400;font-size:clamp(42px,6.8vw,76px);line-height:1.02;letter-spacing:-.015em;max-width:13ch}
-.hero h1 em{font-style:italic;color:var(--green)}
-.hero .lede{margin-top:26px;max-width:58ch}
-.hero .actions{margin-top:36px;display:flex;flex-wrap:wrap;gap:14px;align-items:center}
-.btn{display:inline-flex;align-items:center;gap:10px;font-family:var(--mono);font-size:14px;font-weight:500;padding:12px 22px;border-radius:9px;border:1px solid var(--green);background:var(--green);color:#07130B;transition:transform .18s ease,box-shadow .18s ease;cursor:pointer}
-.btn:hover{transform:translateY(-2px);box-shadow:0 10px 30px -12px rgba(82,196,137,.45);text-decoration:none}
-.btn.ghost{background:transparent;color:var(--ink);border-color:var(--line2)}
-.btn.ghost:hover{border-color:var(--dim);box-shadow:none}
-.btn svg{width:16px;height:16px;fill:currentColor}
-.installline{margin-top:22px;font-family:var(--mono);font-size:13.5px;color:var(--dim)}
-.installline .c{color:var(--ink);background:var(--bg3);border:1px solid var(--line);padding:6px 12px;border-radius:7px;white-space:nowrap}
-.copyable{cursor:pointer;position:relative}
-.copyable:hover{border-color:var(--green)}
-.copyable .tick{color:var(--green);opacity:0;margin-left:8px;transition:opacity .2s}
-.copyable.copied .tick{opacity:1}
-.badges{margin-top:26px;display:flex;gap:10px;flex-wrap:wrap}
-.badge{font-family:var(--mono);font-size:11.5px;color:var(--dim);border:1px solid var(--line);border-radius:99px;padding:4px 12px}
-.badge b{color:var(--green);font-weight:500}
+.hero{padding-block:clamp(72px,12vw,150px) clamp(48px,7vw,88px)}
+.hero h1{font-size:clamp(44px,6.6vw,88px);line-height:.98;letter-spacing:-0.045em;font-weight:700;max-width:15ch;text-wrap:balance;margin-bottom:32px}
+.hero .lead{font-size:19px;color:var(--muted);max-width:50ch;margin-bottom:32px}
+.actions{display:flex;gap:12px;flex-wrap:wrap}
+.btn{display:inline-flex;align-items:center;min-height:44px;padding:0 18px;border-radius:10px;border:1px solid var(--line-2);text-decoration:none;font-weight:600;font-size:15px}
+.btn:hover{border-color:var(--faint)}
+.btn.primary{background:var(--text);border-color:var(--text);color:#000}
+.btn.primary:hover{background:#fff;border-color:#fff}
+.hint{margin-top:56px;font-size:15px;color:var(--faint)}
+.facts{margin-top:10px;font-size:14px;color:var(--faint)}
 
-/* terminal */
-.term{margin-top:56px;background:var(--bg2);border:1px solid var(--line2);border-radius:14px;overflow:hidden;box-shadow:0 30px 80px -30px rgba(0,0,0,.6)}
-.term-bar{display:flex;align-items:center;gap:14px;padding:12px 18px;border-bottom:1px solid var(--line);background:var(--bg3);flex-wrap:wrap}
-.term-bar .path{font-family:var(--mono);font-size:13px;color:var(--dim)}
-.term-bar .meter{margin-left:auto;font-family:var(--mono);font-size:13px;color:var(--dim)}
-.term-bar .meter b{color:var(--ink);font-weight:500}
-.meter .saved{color:var(--green);font-weight:700;margin-left:12px;opacity:0;transition:opacity .3s}
-.meter .saved.on{opacity:1}
-.term-body{padding:22px 24px;font-family:var(--mono);font-size:13.5px;line-height:1.75;min-height:340px}
-.term-body .tl{display:block;white-space:pre;overflow-x:auto}
-.tl .ln{color:var(--faint);margin-right:14px;user-select:none}
-.tl.ok{color:var(--ink)}
-.tl.g{color:var(--green)}
-.tl.r{color:var(--red)}
-.tl.c{color:var(--dim)}
-.tl.h{color:var(--blue)}
-.tl.stub{color:var(--green);font-weight:500}
-.trunc{color:var(--faint)}
-.term-btns{display:flex;gap:10px;padding:14px 18px;border-top:1px solid var(--line);background:var(--bg3);flex-wrap:wrap}
-.tbtn{font-family:var(--mono);font-size:13px;color:var(--dim);background:transparent;border:1px solid var(--line2);border-radius:8px;padding:9px 16px;cursor:pointer;transition:all .15s}
-.tbtn:hover{color:var(--ink);border-color:var(--dim)}
-.tbtn.active{color:#07130B;background:var(--green);border-color:var(--green);font-weight:600}
-.tbtn:disabled{opacity:.35;cursor:not-allowed}
-.term-note{font-family:var(--mono);font-size:12px;color:var(--faint);margin-left:auto;align-self:center}
+/* scrolly chapters */
+.chapter{padding-block:clamp(24px,4vw,48px)}
+.scrolly{display:grid;gap:48px;grid-template-columns:minmax(0,1fr)}
+.stage{margin:0}
+.steps .step{min-height:auto;padding-block:28px;opacity:.42;transition:opacity .45s ease}
+.steps .step.is-active{opacity:1}
+.steps .step h3{font-size:clamp(24px,2.6vw,32px);line-height:1.15;letter-spacing:-0.02em;font-weight:650;margin-bottom:12px}
+.steps .step p{color:var(--muted);max-width:44ch;font-size:18px}
+.steps .step:first-of-type{padding-top:12px}
+.stage-card{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:clamp(20px,3vw,32px)}
+.count{font-size:clamp(22px,2.4vw,28px);line-height:1.2;font-weight:650;letter-spacing:-0.02em;font-variant-numeric:tabular-nums}
+.note{margin-top:10px;color:var(--muted);font-size:15px;min-height:3em}
+.band{display:none;margin-top:22px;padding:8px 12px;border:1px dashed var(--hunk);border-radius:8px;color:var(--hunk);font:13px/1.4 var(--mono)}
+.stage-card[data-state="1"] .band{display:block}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:10px;margin-top:22px}
+.tile{display:flex;flex-direction:column;justify-content:center;gap:2px;min-height:78px;padding:10px 12px;border:1px solid var(--line-2);border-radius:10px;background:var(--inset);font:12px/1.3 var(--mono);color:var(--faint)}
+.tile b{font:600 20px/1.1 var(--mono);color:var(--text)}
+.tile.keep{border-color:var(--text)}
+.tile.stub{border-style:dashed}
+.tile.stub b{color:var(--muted)}
+.tile.summary{grid-column:1/-1;min-height:96px;border-color:var(--del)}
+.tile.summary b{font-size:18px}
+.stage-card[data-state="1"] .tile{border-style:dashed;opacity:.72}
+@media (prefers-reduced-motion:no-preference){
+  .tile{animation:pop .42s cubic-bezier(.2,.7,.2,1) both;animation-delay:calc(var(--i,0) * 40ms)}
+  @keyframes pop{from{opacity:0;transform:translateY(6px) scale(.98)}to{opacity:1;transform:none}}
+}
 
-/* diff-row table */
-.rows{margin-top:34px;border:1px solid var(--line);border-radius:12px;overflow:hidden}
-.row{display:grid;grid-template-columns:34px 1fr;gap:18px;padding:18px 22px;border-top:1px solid var(--line);background:var(--bg2)}
-.row:first-child{border-top:0}
-.row .sign{font-family:var(--mono);font-size:14px;color:var(--faint)}
-.row.plus .sign{color:var(--green)}
-.row.minus .sign{color:var(--red)}
-.row h3{font-family:var(--mono);font-size:14.5px;font-weight:600;color:var(--ink);margin-bottom:5px}
-.row p{font-size:15px;color:var(--dim);max-width:70ch}
-.row code{white-space:normal}
+/* how: pipeline */
+.nodes{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px}
+.nodes li{padding:10px 6px;border:1px solid var(--line-2);border-radius:8px;text-align:center;font:13px/1.2 var(--mono);color:var(--faint);transition:border-color .3s,color .3s,background-color .3s}
+.nodes li.on{border-color:var(--hunk);color:var(--text);background:var(--hunk-bg)}
+@media (max-width:520px){.nodes{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.detail{margin-top:20px;padding:18px;border:1px solid var(--line);border-radius:12px;background:var(--inset);min-height:228px;font:13px/1.6 var(--mono);color:#B5B5B5}
+.detail p{margin:0 0 10px;overflow-wrap:anywhere}
+.d-label{color:var(--faint);font-size:12px}
+.d-note{color:var(--faint);font-size:12px}
+.reg{color:var(--text)}
+.flow{padding:8px 10px;border-left:2px solid var(--line-2)}
+.flow.flag{border-left-color:var(--add);color:var(--add)}
+.two{display:grid;gap:10px;grid-template-columns:minmax(0,1fr)}
+.card{border:1px solid var(--line-2);border-radius:10px;padding:12px;background:var(--surface);min-width:0}
+.card p{margin:4px 0}
+.dl{display:block;white-space:pre;overflow-x:auto;padding:0 6px;margin:0 -6px}
+.dl.add{background:var(--add-bg);color:var(--add-ink)}
+.dl.del{background:var(--del-bg);color:var(--del-ink)}
+.dl.hunk{color:var(--hunk)}
+.dl.hunk{background:var(--hunk-bg)}
 
-/* steps */
-.steps{margin-top:34px;display:grid;gap:0}
-.step{display:grid;grid-template-columns:64px 1fr;gap:20px;padding:26px 4px;border-top:1px solid var(--line)}
-.step .n{font-family:var(--serif);font-style:italic;font-size:34px;color:var(--green);line-height:1}
-.step h3{font-size:17px;font-weight:600;margin-bottom:6px}
-.step p{color:var(--dim);font-size:15.5px;max-width:64ch}
+/* stage on desktop: pinned while the steps scroll past */
+@media (min-width:900px){
+  .scrolly{grid-template-columns:minmax(0,1fr) minmax(0,1.05fr);gap:80px;align-items:start}
+  .scrolly .steps{grid-column:1;grid-row:1}
+  .scrolly .stage{grid-column:2;grid-row:1;position:sticky;top:calc(var(--hh) + 24px);height:calc(100vh - var(--hh) - 48px);display:flex;align-items:center}
+  .scrolly .stage .stage-card{width:100%}
+  .scrolly.flip .stage{grid-column:1}
+  .scrolly.flip .steps{grid-column:2}
+  .steps .step{min-height:78vh;display:flex;flex-direction:column;justify-content:center}
+  .steps .step:first-of-type{padding-top:28px}
+}
+@media (max-width:899px){
+  .steps .step{padding-block:24px}
+}
 
-/* bench table */
-.bench{margin-top:36px;width:100%;border-collapse:collapse;font-size:15px}
-.bench th{font-family:var(--mono);font-size:12px;font-weight:500;color:var(--faint);text-align:left;padding:10px 14px;border-bottom:1px solid var(--line2);letter-spacing:.04em}
-.bench td{padding:15px 14px;border-bottom:1px solid var(--line);color:var(--dim)}
-.bench td.m{font-family:var(--mono);font-size:13.5px;color:var(--ink);white-space:nowrap}
-.bench .d{font-family:var(--mono);font-weight:700;color:var(--green);white-space:nowrap}
-.bench tr:hover td{background:var(--bg2)}
-.footnote{margin-top:16px;font-size:13.5px;color:var(--faint);font-family:var(--mono);line-height:1.7}
-.tblwrap{overflow-x:auto}
+/* try it */
+.compare{padding-block:clamp(72px,10vw,120px);border-top:1px solid var(--line)}
+.compare-head{display:flex;justify-content:space-between;align-items:flex-end;gap:24px 40px;flex-wrap:wrap;margin-bottom:28px}
+.controls{display:flex;gap:8px;flex-wrap:wrap}
+.btn-s{min-height:40px;padding:0 14px;border-radius:9px;border:1px solid var(--line-2);background:transparent;cursor:pointer;font-weight:600;font-size:14px}
+.btn-s:hover{border-color:var(--faint)}
+.btn-s.primary{background:var(--text);border-color:var(--text);color:#000}
+.btn-s.primary:hover{background:#fff}
+.disk{font:14px/1.5 var(--mono);color:var(--muted);margin-bottom:16px}
+.versus{display:grid;gap:16px}
+@media (min-width:860px){.versus{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}}
+.pane{border:1px solid var(--line);border-radius:16px;background:var(--surface);overflow:hidden;display:flex;flex-direction:column;min-width:0}
+.pane-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:16px 20px;border-bottom:1px solid var(--line)}
+.pane-head h3{font-size:17px;font-weight:600}
+.pane-head .count{font:600 15px var(--mono);color:var(--muted)}
+.pane.yes .pane-head .count{color:var(--add)}
+.transcript{height:380px;overflow-y:auto}
+@media (max-width:520px){.transcript{height:300px}}
+.empty{margin:0;padding:24px 20px;color:var(--faint);font-size:15px}
+.entry{padding:14px 20px;border-bottom:1px solid var(--line)}
+.entry:last-child{border-bottom:0}
+@media (prefers-reduced-motion:no-preference){
+  .entry{animation:enter .22s ease-out}
+  @keyframes enter{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+}
+.tag{display:block;font:12px/1.4 var(--mono);color:var(--faint);margin-bottom:8px}
+.body{font:13px/1.6 var(--mono);color:#9A9A9A;overflow-wrap:anywhere}
+.stub{margin:0;color:#9A9A9A}
+.more{padding:0 0 0 0;color:var(--faint);font:13px/1.6 var(--mono)}
+.l{display:grid;grid-template-columns:3ch 2ch minmax(0,1fr);white-space:pre;padding:0 20px;margin:0 -20px;font:13px/1.6 var(--mono)}
+.l .ln{color:var(--gutter)}
+.l.add{background:var(--add-bg);color:var(--add-ink)}
+.l.del{background:var(--del-bg);color:var(--del-ink)}
+.l.add .ln,.l.del .ln{color:inherit;opacity:.6}
+.l.hunk{grid-template-columns:minmax(0,1fr);background:var(--hunk-bg);color:var(--hunk);padding-block:2px}
+.l.hunk .ln,.l.hunk .mk{display:none}
+.fineprint{margin-top:20px;font-size:14px;color:var(--faint);max-width:70ch}
 
-/* install panels */
-.panels{margin-top:36px;display:grid;grid-template-columns:1fr 1fr;gap:20px}
-@media(max-width:860px){.panels{grid-template-columns:1fr}}
-.panel{background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:26px}
-.panel .tag{font-family:var(--mono);font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--green);margin-bottom:10px;display:block}
-.panel h3{font-size:19px;font-weight:600;margin-bottom:6px}
-.panel .sub{font-size:14.5px;color:var(--dim);margin-bottom:18px}
-.panel pre{background:#090B0A;border:1px solid var(--line);border-radius:9px;padding:16px;font-family:var(--mono);font-size:13px;line-height:1.7;overflow-x:auto;position:relative}
-.panel pre:hover{border-color:var(--line2)}
-.panel .after{margin-top:14px;font-size:14px;color:var(--faint)}
-.panel .after b{color:var(--dim);font-weight:500}
+/* measured */
+.split{display:grid;gap:40px;grid-template-columns:minmax(0,1fr)}
+@media (min-width:860px){.split{grid-template-columns:minmax(0,1fr) minmax(0,1.5fr);gap:72px}.split>:first-child{position:sticky;top:calc(var(--hh) + 32px);align-self:start}}
+.section{padding-block:clamp(72px,10vw,128px);border-top:1px solid var(--line)}
+.bars{display:grid;gap:36px}
+.group{padding-top:24px;border-top:1px solid var(--line)}
+.group h3{font-size:19px;font-weight:600}
+.group .sub{color:var(--muted);font-size:15px;margin-top:2px}
+.line{display:grid;grid-template-columns:56px minmax(0,1fr) 84px;align-items:center;gap:14px;margin-top:14px;font:14px var(--mono)}
+.line span:first-child{color:var(--faint)}
+.track{height:14px;background:var(--inset);border-radius:4px;overflow:hidden}
+.bar{height:100%;width:var(--w);border-radius:4px;transition:width 1.1s cubic-bezier(.2,.7,.2,1)}
+.bar.parked{background:#3A3A3A}
+.bar.on{background:var(--add)}
+.js .bars:not(.in) .bar{width:0}
+.val{text-align:right;color:var(--muted);font-variant-numeric:tabular-nums}
+.delta{font:600 22px var(--sans);color:var(--add);margin-top:14px;letter-spacing:-0.02em}
+.notes{margin:36px 0 0;padding:0;list-style:none;color:var(--muted)}
+.notes li{padding:10px 0 10px 20px;position:relative}
+.notes li::before{content:"";position:absolute;left:0;top:19px;width:8px;height:1px;background:var(--faint)}
+.notes li+li{border-top:1px solid var(--line)}
+@media (prefers-reduced-motion:reduce){.bar{transition:none}}
+
+/* install */
+.install{display:grid;gap:56px;grid-template-columns:minmax(0,1fr)}
+@media (min-width:860px){.install{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}}
+.install .mode{color:var(--muted);font-size:15px;margin:0 0 4px}
+.install .after{margin-top:16px;color:var(--muted);font-size:15px;max-width:52ch}
+.code{position:relative;margin:20px 0 0;background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.code pre{margin:0;padding:18px 20px;overflow-x:auto;font:14px/1.65 var(--mono);color:#C4C4C4}
+.copy{position:absolute;top:10px;right:10px;font:500 12px var(--sans);color:var(--muted);background:#000;border:1px solid var(--line-2);border-radius:6px;padding:4px 10px;cursor:pointer}
+.copy:hover{color:var(--text);border-color:var(--faint)}
+
+/* ceilings */
+.ceil{border-top:1px solid var(--line)}
+.ceil details{border-bottom:1px solid var(--line)}
+.ceil summary{list-style:none;cursor:pointer;display:grid;grid-template-columns:2.5ch minmax(0,1fr) 2ch;gap:12px;align-items:center;padding:20px 0;font-size:19px;font-weight:600;letter-spacing:-0.01em}
+.ceil summary::-webkit-details-marker{display:none}
+.ceil summary .m{font:18px var(--mono);color:var(--del)}
+.ceil summary .tog{font:20px var(--mono);color:var(--faint);text-align:right}
+.ceil summary .tog::before{content:"+"}
+.ceil details[open] summary .tog::before{content:"−"}
+.ceil details p{margin:0 0 22px;padding-left:calc(2.5ch + 12px);color:var(--muted);max-width:66ch}
+.ceil summary:hover{color:var(--text)}
 
 /* knobs */
-.knobs{margin-top:30px;display:grid;gap:12px}
-.knob{display:grid;grid-template-columns:180px 1fr;gap:18px;padding:16px 0;border-top:1px solid var(--line);font-size:15px}
-.knob .k{font-family:var(--mono);font-size:13.5px;color:var(--ink)}
-.knob .v{color:var(--dim)}
-@media(max-width:700px){.knob{grid-template-columns:1fr;gap:4px}}
-
-/* limits */
-ul.limits{margin-top:26px;list-style:none;display:grid;gap:14px}
-ul.limits li{display:grid;grid-template-columns:22px 1fr;gap:14px;color:var(--dim);font-size:15.5px;max-width:74ch}
-ul.limits li::before{content:"−";font-family:var(--mono);color:var(--red);font-weight:700}
-ul.limits b{color:var(--ink);font-weight:500}
+.knobs{margin:0}
+.knobs div{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.4fr);gap:24px;padding:18px 0;border-top:1px solid var(--line)}
+.knobs div:last-child{border-bottom:1px solid var(--line)}
+.knobs dt{font:500 15px/1.5 var(--mono);overflow-wrap:anywhere}
+.knobs dd{margin:0;color:var(--muted)}
+@media (max-width:640px){.knobs div{grid-template-columns:minmax(0,1fr);gap:6px}}
 
 /* footer */
-footer{margin-top:120px;padding:56px 0 64px;border-top:1px solid var(--line)}
-footer .eof{font-family:var(--mono);font-size:13px;color:var(--faint)}
-footer .cols{display:flex;flex-wrap:wrap;gap:34px;margin-top:22px;align-items:baseline}
-footer a{color:var(--dim);font-family:var(--mono);font-size:13.5px}
-footer a:hover{color:var(--ink)}
-footer .sig{margin-left:auto;font-family:var(--serif);font-style:italic;font-size:15px;color:var(--faint)}
-
-/* reveals */
-.rv{opacity:0;transform:translateY(22px);transition:opacity .7s cubic-bezier(.16,1,.3,1),transform .7s cubic-bezier(.16,1,.3,1)}
-.rv.in{opacity:1;transform:none}
-.rv.d1{transition-delay:.08s}.rv.d2{transition-delay:.16s}.rv.d3{transition-delay:.24s}.rv.d4{transition-delay:.32s}
-@media(prefers-reduced-motion:reduce){.rv{opacity:1;transform:none;transition:none}.btn:hover{transform:none}html{scroll-behavior:auto}}
+.site-footer{border-top:1px solid var(--line);padding-block:48px;font-size:14px;color:var(--faint)}
+.site-footer .links{display:flex;flex-wrap:wrap;gap:6px 22px;margin-bottom:16px}
+.site-footer a{color:var(--muted)}
+.site-footer a:hover{color:var(--text)}
 </style>
 </head>
 <body>
 
-<nav>
-  <div class="nav-in">
-    <a class="brand" href="#top">
-      <img src="favicon.svg" alt="gfc logo">
-      <b>gfc</b><i>git-for-context</i>
+<header class="site-header">
+  <div class="wrap bar">
+    <a class="brand" href="#top" aria-label="GFC home">
+      <svg width="26" height="26" viewBox="0 0 168 168" aria-hidden="true" focusable="false">
+        <rect width="168" height="168" rx="40" fill="#111111" stroke="#2A2A2A" stroke-width="4"/>
+        <path d="M57 56V112M29 84H85" stroke="#EDEDED" stroke-width="14" stroke-linecap="round"/>
+        <path d="M108 76H142M108 92H142" stroke="#5C5C5C" stroke-width="10" stroke-linecap="round"/>
+      </svg>
+      <span>GFC</span>
     </a>
-    <div class="links">
-      <a href="#why">why</a>
-      <a href="#how">how</a>
-      <a href="#demo" onclick="return false" style="cursor:default;opacity:.55">demo↑</a>
-      <a href="#bench">measured</a>
-      <a href="#install">install</a>
-      <a class="gh" href="https://github.com/jjjebli/gfc" target="_blank" rel="noopener">
-        <svg viewBox="0 0 16 16"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
-        jjjebli/gfc
-      </a>
-    </div>
+    <nav class="site-nav" aria-label="Sections">
+      <a href="#why">Why</a>
+      <a href="#how">How</a>
+      <a href="#compare">Try it</a>
+      <a href="#measured">Measured</a>
+      <a href="#install">Install</a>
+      <a href="https://github.com/jjjebli/gfc">GitHub</a>
+    </nav>
   </div>
-</nav>
+  <div class="progress" aria-hidden="true"></div>
+</header>
 
 <main id="top">
 
-<!-- ============ HERO ============ -->
-<section class="hero" id="hero">
-  <span class="hunk">@@ -0,0 +1,12 @@</span>
-  <h1 class="rv">Stop paying for files your model <em>already&nbsp;read.</em></h1>
-  <p class="lede rv d1"><strong>gfc — git-for-context.</strong> The transcript is a linear replay: every turn re-sends content the model has already seen. gfc treats it like git treats a working tree — the model gets a <strong>diff against what it last saw</strong>, never a full re-checkout. Unchanged re-reads collapse to hash-verified stubs. Changed files return just the hunk. Zero per-turn overhead, zero dependencies.</p>
-
-  <div class="term rv d2" id="demo">
-    <div class="term-bar">
-      <span class="path">read&nbsp;/Users/you/src/server.ts</span>
-      <span class="meter">context this turn: <b id="tok">1,842</b><span class="saved" id="saved">−6,361 tokens</span></span>
+  <section class="wrap hero" aria-labelledby="hero-title">
+    <h1 id="hero-title">Stop paying for files your model already read.</h1>
+    <p class="lead">GFC is an OpenCode plugin and MCP server. It treats the transcript the way git treats a working tree: the model gets a diff against what it last saw, never a full re-checkout.</p>
+    <div class="actions">
+      <a class="btn primary" href="#install">Install in two commands</a>
+      <a class="btn" href="https://github.com/jjjebli/gfc">View on GitHub</a>
     </div>
-    <div class="term-body" id="term-body">
-      <span class="tl c">// the model reads, re-reads, edits — watch the meter.</span>
-      <span class="tl c">→ press <span class="mono">read</span> to begin.</span>
+    <p class="facts">MIT license. Zero dependencies. Zero tokens of per-turn overhead. Measured −22% to −34% context per turn.</p>
+    <p class="hint">Scroll to watch one file get read ten times.</p>
+  </section>
+
+  <!-- why: the visual is pinned on the right while the steps scroll on the left -->
+  <section class="chapter" id="why" aria-labelledby="why-title">
+    <div class="wrap scrolly" data-scrolly="why">
+      <figure class="stage" aria-label="Diagram of repeated reads filling the transcript">
+        <div class="stage-card" id="why-card" data-state="0">
+          <p class="count" id="why-count" aria-live="polite"></p>
+          <div class="band" aria-hidden="true">cached prefix: cheaper to send, still counted</div>
+          <div class="tiles" id="why-tiles"></div>
+          <p class="note" id="why-note"></p>
+        </div>
+      </figure>
+      <div class="steps">
+        <h2 id="why-title">The transcript is a linear replay.</h2>
+        <p class="intro">Every turn re-sends the whole history. Here is what the usual fixes change, and what they don’t.</p>
+        <article class="step" data-step="0">
+          <h3>Re-reads re-pay.</h3>
+          <p>The only way a model knows a file at turn 40 is that the file is literally present in the transcript at turn 40. Read a 500-line file ten times and you get ten copies, each billed and each diluting attention.</p>
+        </article>
+        <article class="step" data-step="1">
+          <h3>Caching cuts cost, not tokens.</h3>
+          <p>Provider prompt caches lower the price of re-sent context. The tokens still flow, still compete for attention, and the cache breaks as soon as history changes mid-prefix.</p>
+        </article>
+        <article class="step" data-step="2">
+          <h3>Summarization is lossy.</h3>
+          <p>Compaction throws away detail, and the model re-derives what was lost. That is waste plus repeated work.</p>
+        </article>
+        <article class="step" data-step="3">
+          <h3>GFC: exact, not approximate.</h3>
+          <p>Not compression, but deduplication. A sha256 proves the bytes are identical, so the duplicate never enters the transcript at all. Nothing is summarized away. The content is verifiably still in context from the first read.</p>
+        </article>
+      </div>
     </div>
-    <div class="term-btns">
-      <button class="tbtn" id="b1">read</button>
-      <button class="tbtn" id="b2" disabled>read again</button>
-      <button class="tbtn" id="b3" disabled>edit + read</button>
-      <button class="tbtn" id="b0" disabled style="margin-left:auto">reset</button>
-      <span class="term-note">live demo · exactly what gfc sends the model</span>
+  </section>
+
+  <!-- how: the pipeline lights up step by step while the detail changes -->
+  <section class="chapter" id="how" aria-labelledby="how-title">
+    <div class="wrap scrolly flip" data-scrolly="how">
+      <figure class="stage" aria-label="Diagram of the GFC pipeline">
+        <div class="stage-card">
+          <ol class="nodes" id="how-nodes">
+            <li>read</li>
+            <li>hash</li>
+            <li>intercept</li>
+            <li>delta</li>
+            <li>scope</li>
+          </ol>
+          <div class="detail" id="how-detail" aria-live="polite"></div>
+        </div>
+      </figure>
+      <div class="steps">
+        <h2 id="how-title">How it works.</h2>
+        <p class="intro">One registry, one invariant. The filesystem is the store of truth. If the content on disk still hashes to the registered value, it is byte-identical to what the model already saw.</p>
+        <article class="step" data-step="0">
+          <h3>Hash every full read.</h3>
+          <p>sha256 of file content, recorded per session in <code>~/.gfc/registry.json</code>. Registry writes are atomic and cross-process locked, so parallel sessions can’t corrupt each other.</p>
+        </article>
+        <article class="step" data-step="1">
+          <h3>Intercept before the transcript.</h3>
+          <p>The OpenCode plugin hooks <code>tool.execute.after</code> and replaces repeat content before it enters the message history. The duplicate never exists.</p>
+        </article>
+        <article class="step" data-step="2">
+          <h3>Return the delta.</h3>
+          <p>Unchanged gives a ~45-token stub that cites the hash. Changed gives a unified diff from last-seen to current. Slice reads always pass through, with a note if the file has drifted.</p>
+        </article>
+        <article class="step" data-step="3">
+          <h3>Scope to the session.</h3>
+          <p>Models are stateless, so the first full read in any session is always real content. No stub can hide something the model hasn’t seen. Compaction receives the verified-file list, so summaries stay lean.</p>
+        </article>
+      </div>
     </div>
-  </div>
+  </section>
 
-  <div class="actions rv d3">
-    <a class="btn" href="https://github.com/jjjebli/gfc" target="_blank" rel="noopener">
-      <svg viewBox="0 0 16 16"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
-      View on GitHub
-    </a>
-    <a class="btn ghost" href="#install">Install in 2 commands →</a>
-  </div>
-
-  <div class="installline rv d4">git clone https://github.com/jjjebli/gfc <span class="c copyable" id="cpcmd">~/.gfc<span class="tick">✓ copied</span></span></div>
-
-  <div class="badges rv d4">
-    <span class="badge">license <b>MIT</b></span>
-    <span class="badge">dependencies <b>0</b></span>
-    <span class="badge">per-turn overhead <b>0 tokens</b></span>
-    <span class="badge">measured <b>−22% to −34%</b> context/turn</span>
-  </div>
-</section>
-
-<!-- ============ WHY ============ -->
-<section id="why" data-line="14">
-  <span class="hunk">@@ -14,9 +14,9 @@</span>
-  <h2>The transcript is a <em>linear replay.</em></h2>
-  <div class="rows rv">
-    <div class="row">
-      <span class="sign">·</span>
-      <div><h3>Re-reads re-pay</h3><p>The only way a model "knows" a file at turn 40 is the file being literally present in the transcript at turn 40. Same 500-line file read ten times? Ten copies. Every one billed, every one diluting attention.</p></div>
+  <!-- try it: the same reads with and without GFC -->
+  <section class="compare" id="compare" aria-labelledby="compare-title">
+    <div class="wrap">
+      <div class="compare-head">
+        <div>
+          <h2 id="compare-title">Try it.</h2>
+          <p class="intro">One file, read the way an agent reads it, with and without GFC. Read it a few times, then edit it and read again.</p>
+        </div>
+        <div class="controls" role="group" aria-label="Simulation controls">
+          <button class="btn-s primary" type="button" data-act="read">Read</button>
+          <button class="btn-s" type="button" data-act="five">Read five times</button>
+          <button class="btn-s" type="button" data-act="edit">Edit the file</button>
+          <button class="btn-s" type="button" data-act="reset">Reset</button>
+        </div>
+      </div>
+      <p class="disk" id="cmp-status">On disk: const retries = 3. The model has seen nothing yet.</p>
+      <div class="versus">
+        <div class="pane">
+          <div class="pane-head"><h3>Without GFC</h3><span class="count" id="no-count">0 lines sent</span></div>
+          <div class="transcript" id="no-log" role="log"><p class="empty">Nothing read yet.</p></div>
+        </div>
+        <div class="pane yes">
+          <div class="pane-head"><h3>With GFC</h3><span class="count" id="yes-count">0 lines sent</span></div>
+          <div class="transcript" id="yes-log" role="log"><p class="empty">Nothing read yet.</p></div>
+        </div>
+      </div>
+      <p class="fineprint">Counts lines sent to the model, not tokens. A stub is one line here, though it costs about 45 tokens.</p>
     </div>
-    <div class="row">
-      <span class="sign">·</span>
-      <div><h3>Caching cuts cost, not tokens</h3><p>Provider prompt caches reduce the <i>price</i> of re-sent context — the tokens still flow, still compete for attention, and the cache shatters the moment history changes mid-prefix.</p></div>
-    </div>
-    <div class="row">
-      <span class="sign">·</span>
-      <div><h3>Summarization is lossy</h3><p>Compaction throws away hard-won detail, and the model re-derives what was lost. Waste plus repeated work.</p></div>
-    </div>
-    <div class="row plus">
-      <span class="sign">+</span>
-      <div><h3>gfc: exact, not approximate</h3><p>Not compression — <strong>deduplication</strong>. A sha256 says the bytes are identical, so the duplicate never enters the transcript at all. Nothing is summarized away; the content is verifiably still in context from the first read.</p></div>
-    </div>
-  </div>
-</section>
+  </section>
 
-<!-- ============ HOW ============ -->
-<section id="how" data-line="26">
-  <span class="hunk">@@ -26,14 +26,14 @@</span>
-  <h2>How it <em>works.</em></h2>
-  <p class="lede">One registry, one invariant: <strong>the filesystem is the store of truth.</strong> If on-disk content still hashes to the registered value, it is byte-identical to what the model already saw.</p>
-  <div class="steps">
-    <div class="step rv"><div class="n">i.</div><div><h3>Hash every full read</h3><p>sha256 of file content, recorded per session in <code>~/.gfc/registry.json</code>. Registry writes are atomic and cross-process locked — parallel sessions can't corrupt each other.</p></div></div>
-    <div class="step rv d1"><div class="n">ii.</div><div><h3>Intercept before the transcript</h3><p>OpenCode plugin hooks <code>tool.execute.after</code> and replaces repeat content <strong>before it enters the message history</strong>. The duplicate never exists.</p></div></div>
-    <div class="step rv d2"><div class="n">iii.</div><div><h3>Return the delta</h3><p>Unchanged → a ~45-token stub citing the hash. Changed → a unified diff of last-seen → current. Slice reads always pass through, with a note if the file drifted.</p></div></div>
-    <div class="step rv d3"><div class="n">iv.</div><div><h3>Scope to the session</h3><p>Models are stateless: the first full read in any session is always real content. No stub can ever hide something the model hasn't seen. Compaction receives the verified-file list so summaries stay lean.</p></div></div>
-  </div>
-
-  <div class="rows rv d2">
-    <div class="row plus"><span class="sign">+</span><div><h3>Re-read, unchanged file</h3><p><code>[gfc] unchanged: "/src/server.ts" is byte-identical to the full content already present earlier in this conversation (sha256 77ed7fe0c7ed, 47 lines). Nothing new to show.</code></p></div></div>
-    <div class="row"><span class="sign">±</span><div><h3>Re-read, changed file</h3><p>A diff hunk instead of the file: <code>@@ -31,7 +31,7 @@ − const retries = 3 / + const retries = 5</code> — plus the full-file footer if the model needs a region again.</p></div></div>
-    <div class="row"><span class="sign">·</span><div><h3>Slice reads (offset/limit)</h3><p>Real lines, always — the model explicitly asked for them. If the file changed since its last full read, a note says so before the lines.</p></div></div>
-    <div class="row minus"><span class="sign">−</span><div><h3>What never happens</h3><p>No stub before the first read in a session. No stub for tiny outputs. No stubbed images, errors, or directories. The benchmark found <strong>zero</strong> re-fetch side-effects — models trust the stub and move on.</p></div></div>
-  </div>
-</section>
-
-<!-- ============ BENCH ============ -->
-<section id="bench" data-line="42">
-  <span class="hunk">@@ -42,11 +42,11 @@</span>
-  <h2>Measured, not <em>vibes.</em></h2>
-  <p class="lede">72-run A/B benchmark — 3 opencode free-tier models × 4 scenarios × 3 repetitions, fresh sessions, identical prompts, GFC on vs parked. All attempts counted, no outlier removal. Harness ships in <a href="https://github.com/jjjebli/gfc/tree/master/bench" target="_blank" rel="noopener">bench/</a>.</p>
-  <div class="tblwrap rv">
-  <table class="bench">
-    <thead><tr><th>scenario</th><th>model</th><th>per-turn context A → B</th><th>delta</th></tr></thead>
-    <tbody>
-      <tr><td>re-read 2000-line file</td><td>nemotron-3-ultra</td><td class="m">66,230 → 43,410</td><td class="d">−34%</td></tr>
-      <tr><td>edit + re-read</td><td>nemotron-3-ultra</td><td class="m">66,392 → 43,597</td><td class="d">−34%</td></tr>
-      <tr><td>re-read 2000-line file</td><td>ling-3.1-flash</td><td class="m">58,702 → 43,521</td><td class="d">−26%</td></tr>
-      <tr><td>re-read 2000-line file</td><td>step-5-preview</td><td class="m">44,839 → 34,908</td><td class="d">−22%</td></tr>
-      <tr><td>small file / first read</td><td>all three</td><td class="m">unchanged</td><td class="d">0% by design</td></tr>
-    </tbody>
-  </table>
-  </div>
-  <p class="footnote">mechanism fired 9/9 in every valid run · comprehension after a stub: 100% · zero re-fetch side-effects ·
-  free-tier prompt caching is nondeterministic — benchmark with per-turn context totals, not raw input sums.
-  honesty notes in the README.</p>
-</section>
-
-<!-- ============ INSTALL ============ -->
-<section id="install" data-line="58">
-  <span class="hunk">@@ -58,9 +58,9 @@</span>
-  <h2>Install in <em>two commands.</em></h2>
-  <div class="panels">
-    <div class="panel rv">
-      <span class="tag">opencode · hard interception</span>
-      <h3>OpenCode plugin</h3>
-      <p class="sub">Hooks the read tool. Automatic, invisible, enforced.</p>
-      <pre class="copyable">git clone https://github.com/jjjebli/gfc ~/.gfc
-cp ~/.gfc/gfc-plugin.ts ~/.config/opencode/plugins/gfc.ts</pre>
-      <p class="after"><b>Then restart opencode.</b> Nothing to configure — you'll see <code>[gfc]</code> stubs where duplicates used to be. A symlink instead of the copy makes <b>git pull</b> your update path.</p>
+  <!-- measured: bars fill when they scroll into view -->
+  <section class="section" id="measured" aria-labelledby="measured-title">
+    <div class="wrap split">
+      <div>
+        <h2 id="measured-title">Measured, not vibes.</h2>
+        <p class="intro">72-run A/B benchmark: 3 opencode free-tier models × 4 scenarios × 3 repetitions. Fresh sessions, identical prompts, GFC on versus parked. All attempts are counted, with no outlier removal. The harness ships in <code>bench/</code>.</p>
+      </div>
+      <div>
+        <div class="bars" id="bars">
+          <div class="group">
+            <h3>Re-read 2000-line file</h3>
+            <p class="sub">nemotron-3-ultra</p>
+            <div class="line"><span>parked</span><div class="track"><div class="bar parked" style="--w:99.8%"></div></div><span class="val">66,230</span></div>
+            <div class="line"><span>on</span><div class="track"><div class="bar on" style="--w:65.4%"></div></div><span class="val">43,410</span></div>
+            <p class="delta">−34%</p>
+          </div>
+          <div class="group">
+            <h3>Edit + re-read</h3>
+            <p class="sub">nemotron-3-ultra</p>
+            <div class="line"><span>parked</span><div class="track"><div class="bar parked" style="--w:100%"></div></div><span class="val">66,392</span></div>
+            <div class="line"><span>on</span><div class="track"><div class="bar on" style="--w:65.7%"></div></div><span class="val">43,597</span></div>
+            <p class="delta">−34%</p>
+          </div>
+          <div class="group">
+            <h3>Re-read 2000-line file</h3>
+            <p class="sub">ling-3.1-flash</p>
+            <div class="line"><span>parked</span><div class="track"><div class="bar parked" style="--w:88.4%"></div></div><span class="val">58,702</span></div>
+            <div class="line"><span>on</span><div class="track"><div class="bar on" style="--w:65.6%"></div></div><span class="val">43,521</span></div>
+            <p class="delta">−26%</p>
+          </div>
+          <div class="group">
+            <h3>Re-read 2000-line file</h3>
+            <p class="sub">step-5-preview</p>
+            <div class="line"><span>parked</span><div class="track"><div class="bar parked" style="--w:67.5%"></div></div><span class="val">44,839</span></div>
+            <div class="line"><span>on</span><div class="track"><div class="bar on" style="--w:52.6%"></div></div><span class="val">34,908</span></div>
+            <p class="delta">−22%</p>
+          </div>
+        </div>
+        <ul class="notes">
+          <li>Context per turn, in tokens. Every bar uses one scale, so lengths compare across models too.</li>
+          <li>Small files on a first read are unchanged, by design.</li>
+          <li>The mechanism fired 9 of 9 times in every valid run. Comprehension after a stub: 100%. Zero re-fetch side effects.</li>
+          <li>Free-tier prompt caching is nondeterministic, so benchmark with per-turn context totals, not raw input sums. Honesty notes are in the README.</li>
+        </ul>
+      </div>
     </div>
-    <div class="panel rv d1">
-      <span class="tag">codex · any mcp client · advisory</span>
-      <h3>MCP server</h3>
-      <p class="sub">Adds a <code>gfc_read</code> tool your agent is instructed to prefer.</p>
-      <pre class="copyable"># ~/.codex/config.toml
+  </section>
+
+  <section class="section" id="install" aria-labelledby="install-title">
+    <div class="wrap">
+      <h2 id="install-title">Install in two commands.</h2>
+      <p class="intro" style="margin-bottom:48px">Two integration paths. The plugin is enforced. The MCP server is advisory.</p>
+      <div class="install">
+        <div>
+          <h3>OpenCode plugin</h3>
+          <p class="mode">Hard interception. Hooks the read tool. Automatic, invisible, enforced.</p>
+          <div class="code">
+            <button class="copy" type="button">Copy</button>
+            <pre><code>git clone https://github.com/jjjebli/gfc ~/.gfc
+cp ~/.gfc/gfc-plugin.ts ~/.config/opencode/plugins/gfc.ts</code></pre>
+          </div>
+          <p class="after">Then restart OpenCode. There is nothing else to configure. You’ll see <code>[GFC]</code> stubs where duplicates used to be. Symlink the plugin instead of copying it, and <code>git pull</code> becomes your update path.</p>
+        </div>
+        <div>
+          <h3>MCP server</h3>
+          <p class="mode">Advisory. Adds a <code>gfc_read</code> tool that your agent is instructed to prefer.</p>
+          <div class="code">
+            <button class="copy" type="button">Copy</button>
+            <pre><code># ~/.codex/config.toml
 [mcp_servers.gfc]
 command = "node"
-args = ["/Users/you/.gfc/mcp.mjs"]</pre>
-      <p class="after"><b>Interactive Codex:</b> approve <code>gfc_read</code> once — always allow. <b>codex exec:</b> add <code>--approve-for-me</code>. Recommended rule for <code>~/.codex/AGENTS.md</code>: prefer <code>gfc_read</code> over cat/head/sed/tail.</p>
+args = ["/Users/you/.GFC/mcp.mjs"]</code></pre>
+          </div>
+          <p class="after">In interactive Codex, approve <code>gfc_read</code> once and always allow it. For <code>codex exec</code>, add <code>--approve-for-me</code>. A recommended rule for <code>~/.codex/AGENTS.md</code>: prefer <code>gfc_read</code> over <code>cat</code>, <code>head</code>, <code>sed</code>, and <code>tail</code>.</p>
+        </div>
+      </div>
     </div>
-  </div>
-</section>
+  </section>
 
-<!-- ============ KNOBS ============ -->
-<section id="knobs" data-line="71">
-  <span class="hunk">@@ -71,6 +71,6 @@</span>
-  <h2>Knobs, all <em>one.</em></h2>
-  <div class="knobs">
-    <div class="knob"><span class="k">GFC_HOME=/dir</span><span class="v">Relocate all state — and isolate benchmarks or parallel installs.</span></div>
-    <div class="knob"><span class="k">GFC_DEBUG=1</span><span class="v">Trace every hook decision to <code>~/.gfc/debug.log</code>.</span></div>
-    <div class="knob"><span class="k">rm -rf ~/.gfc</span><span class="v">Full reset. Rebuilds itself on the next read; costs one full read per file. It's a cache — treat it like one.</span></div>
-    <div class="knob"><span class="k">tests</span><span class="v"><code>GFC_HOME=$(mktemp -d) node ~/.gfc/core.mjs</code> and <code>node ~/.gfc/test.mjs</code> — deterministic, no LLM, no network.</span></div>
-  </div>
-</section>
+  <section class="section" id="knobs" aria-labelledby="knobs-title">
+    <div class="wrap split">
+      <div>
+        <h2 id="knobs-title">Knobs.</h2>
+        <p class="intro">Two environment variables, one reset, and a test suite that runs without an LLM or network access.</p>
+      </div>
+      <dl class="knobs">
+        <div>
+          <dt>GFC_HOME=/dir</dt>
+          <dd>Relocates all state. Useful for isolating benchmarks or parallel installs.</dd>
+        </div>
+        <div>
+          <dt>GFC_DEBUG=1</dt>
+          <dd>Traces every hook decision to <code>~/.gfc/debug.log</code>.</dd>
+        </div>
+        <div>
+          <dt>rm -rf ~/.gfc</dt>
+          <dd>Full reset. Rebuilds itself on the next read and costs one full read per file. It’s a cache, so treat it like one.</dd>
+        </div>
+        <div>
+          <dt>Tests</dt>
+          <dd><code>GFC_HOME=$(mktemp -d) node ~/.gfc/core.mjs</code> and <code>node ~/.gfc/test.mjs</code>. Deterministic, with no LLM and no network.</dd>
+        </div>
+      </dl>
+    </div>
+  </section>
 
-<!-- ============ LIMITS ============ -->
-<section id="limits" data-line="82">
-  <span class="hunk">@@ -82,8 +82,8 @@</span>
-  <h2>Known <em>ceilings.</em></h2>
-  <p class="lede">Stated up front, because a token-saving tool that oversells is a token-wasting tool.</p>
-  <ul class="limits rv">
-    <li><span><b>Diffs are single-hunk.</b> Scattered edits fall back to full content when the diff would be larger. Myers upgrade only when that measurably hurts.</span></li>
-    <li><span><b>Files >512KB are never diffed</b> — full re-read on change. Binary files are rejected outright by the MCP tool.</span></li>
-    <li><span><b>The OpenCode hook</b> relies on <code>tool.execute.after</code> output mutation, verified on opencode 1.18.29. If a future version stops persisting it, the fallback is <code>experimental.chat.messages.transform</code> as a send-time rewriter.</span></li>
-    <li><span><b>No savings without re-reads.</b> If your model reads a file once and never looks back, gfc does nothing — by design, it costs nothing too.</span></li>
-  </ul>
-</section>
-
-<footer>
-  <div class="eof">(End of file — total 8 sections · sha256 of this page's honesty: verified)</div>
-  <div class="cols">
-    <a href="https://github.com/jjjebli/gfc" target="_blank" rel="noopener">github.com/jjjebli/gfc</a>
-    <a href="https://github.com/jjjebli/gfc/blob/master/README.md" target="_blank" rel="noopener">readme</a>
-    <a href="https://github.com/jjjebli/gfc/blob/master/LICENSE" target="_blank" rel="noopener">MIT license</a>
-    <span class="sig">built by Soufiane Bahij · the transcript is a diff, not a replay</span>
-  </div>
-</footer>
+  <section class="section" id="ceilings" aria-labelledby="ceilings-title">
+    <div class="wrap split">
+      <div>
+        <h2 id="ceilings-title">Known ceilings.</h2>
+        <p class="intro">Stated up front, because a token-saving tool that oversells is a token-wasting tool. Open any of them for the details.</p>
+      </div>
+      <div class="ceil">
+        <details>
+          <summary><span class="m">−</span><span>Diffs are single-hunk.</span><span class="tog"></span></summary>
+          <p>Scattered edits fall back to full content when the diff would be larger. A Myers upgrade happens only when that measurably hurts.</p>
+        </details>
+        <details>
+          <summary><span class="m">−</span><span>Files over 512 KB are never diffed.</span><span class="tog"></span></summary>
+          <p>They get a full re-read on change. Binary files are rejected outright by the MCP tool.</p>
+        </details>
+        <details>
+          <summary><span class="m">−</span><span>The OpenCode hook depends on output mutation.</span><span class="tog"></span></summary>
+          <p>It relies on <code>tool.execute.after</code> output mutation, verified on opencode 1.18.29. If a future version stops persisting it, the fallback is <code>experimental.chat.messages.transform</code> as a send-time rewriter.</p>
+        </details>
+        <details>
+          <summary><span class="m">−</span><span>No savings without re-reads.</span><span class="tog"></span></summary>
+          <p>If your model reads a file once and never looks back, GFC does nothing. By design, it costs nothing too.</p>
+        </details>
+      </div>
+    </div>
+  </section>
 
 </main>
 
+<footer class="site-footer">
+  <div class="wrap">
+    <div class="links">
+      <a href="https://github.com/jjjebli/gfc">github.com/jjjebli/gfc</a>
+      <a href="https://github.com/jjjebli/gfc/blob/master/README.md">README</a>
+      <a href="https://github.com/jjjebli/gfc/blob/master/LICENSE">MIT license</a>
+    </div>
+    <p>Built by Soufiane Bahij. The transcript is a diff, not a replay.</p>
+  </div>
+</footer>
+
 <script>
-/* ---------- token counter ---------- */
-const tokEl = document.getElementById("tok");
-const savedEl = document.getElementById("saved");
-let tokCur = 1842, tokTo = 1842;
-function tick(){
-  if (Math.abs(tokTo - tokCur) < 1){ tokCur = tokTo; }
-  else { tokCur += (tokTo - tokCur) * 0.14; requestAnimationFrame(tick); }
-  tokEl.textContent = Math.round(tokCur).toLocaleString("en-US");
-  if (tokCur !== tokTo) requestAnimationFrame(tick);
-}
-function setTok(n){ tokTo = n; requestAnimationFrame(tick); }
-function flashSaved(txt){ savedEl.textContent = txt; savedEl.classList.add("on"); }
+(function () {
+  'use strict';
+  document.documentElement.classList.add('js');
 
-/* ---------- demo terminal ---------- */
-const body = document.getElementById("term-body");
-const b1 = document.getElementById("b1"), b2 = document.getElementById("b2"),
-      b3 = document.getElementById("b3"), b0 = document.getElementById("b0");
-const L = (n, cls, txt) => `<span class="tl ${cls}"><span class="ln">${n}</span>${txt}</span>`;
-const NOSHOW = (txt) => `<span class="tl trunc">${txt}</span>`;
+  function el(tag, cls, text) {
+    var n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text != null) n.textContent = text;
+    return n;
+  }
+  function setText(id, text) {
+    document.getElementById(id).textContent = text;
+  }
 
-const lines = [
-  "import { serve } from \"@hono/node-server\"",
-  "import { auth, session } from \"./auth\"",
-  "import { db } from \"./db\"",
-  "",
-  "const PORT = Number(process.env.PORT ?? 3000)",
-  "const app = new Hono()",
-  "",
-  "app.get(\"/health\", (c) => c.json({ ok: true }))",
-  "",
-  "app.post(\"/session\", async (c) => {",
-  "  const user = await auth(c.req)",
-  "  if (!user) return c.json({ err: \"unauthorized\" }, 401)",
-  "  const s = await db.sessions.create({ userId: user.id })",
-  "  return c.json({ id: s.id })",
-  "})",
-  "",
-  "app.get(\"/session/:id\", async (c) => {",
-  "  const s = await db.sessions.find(c.req.param(\"id\"))",
-  "  if (!s) return c.notFound()",
-  "  return c.json(session.public(s))",
-  "})",
-  "",
-  "// retry policy for flaky upstreams",
-  "const retries = 3",
-  "",
-  "async function withRetry<T>(fn: () => Promise<T>): Promise<T> {",
-  "  for (let i = 0; i < retries; i++) {",
-  "    try { return await fn() }",
-  "    catch (e) { if (i === retries - 1) throw e }",
-  "  }",
-  "  throw new Error(\"unreachable\")",
-  "}",
-  "",
-  "app.post(\"/sync\", async (c) => {",
-  "  const out = await withRetry(() => fetch(UPSTREAM))",
-  "  return c.text(await out.text())",
-  "})",
-  "",
-  "serve({ fetch: app.fetch, port: PORT })",
-  "console.log(`listening on :${PORT}`)",
-];
+  /* 1. reading progress */
+  var progress = document.querySelector('.progress');
+  function updateProgress() {
+    var max = document.documentElement.scrollHeight - window.innerHeight;
+    progress.style.transform = 'scaleX(' + (max > 0 ? window.scrollY / max : 0) + ')';
+  }
+  window.addEventListener('scroll', updateProgress, { passive: true });
+  window.addEventListener('resize', updateProgress);
+  updateProgress();
 
-const state0 = `<span class="tl c">// the model reads, re-reads, edits — watch the meter.</span>
-<span class="tl c">→ press <span class="mono">read</span> to begin.</span>`;
+  /* 2. nav highlights the section in view */
+  var navLinks = document.querySelectorAll('.site-nav a[href^="#"]');
+  if ('IntersectionObserver' in window) {
+    var spy = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (!entry.isIntersecting) return;
+        navLinks.forEach(function (a) {
+          a.setAttribute('aria-current', a.getAttribute('href') === '#' + entry.target.id ? 'true' : 'false');
+        });
+      });
+    }, { rootMargin: '-45% 0px -50% 0px' });
+    document.querySelectorAll('main section[id]').forEach(function (s) { spy.observe(s); });
+  }
 
-function state1(){
-  let h = `<span class="tl c"><path>/Users/you/src/server.ts</path></span>\n`;
-  h += `<span class="tl c"><type>file</type></span>\n`;
-  for (let i = 0; i < 8; i++) h += L(i+1, "ok", esc(lines[i]));
-  h += NOSHOW("   ··· lines 9–38 (30 lines) ···");
-  for (let i = 38; i < lines.length; i++) h += L(i+1, "ok", esc(lines[i]));
-  h += `<span class="tl c">(End of file — total 47 lines · 6,412 tokens entering context)</span>`;
-  return h;
-}
-function esc(s){ return s.replace(/&/g,"&"+"amp;").replace(/</g,"&"+"lt;").replace(/>/g,"&"+"gt;"); }
+  /* 3. scrollytelling: the step in the middle of the screen drives the pinned visual */
+  function scrolly(name, render) {
+    var root = document.querySelector('[data-scrolly="' + name + '"]');
+    var steps = Array.prototype.slice.call(root.querySelectorAll('.step'));
+    var current = -1;
+    function activate(i) {
+      if (i === current) return;
+      current = i;
+      steps.forEach(function (s, j) { s.classList.toggle('is-active', j === i); });
+      render(i);
+    }
+    if ('IntersectionObserver' in window) {
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) activate(Number(e.target.getAttribute('data-step')));
+        });
+      }, { rootMargin: '-45% 0px -45% 0px' });
+      steps.forEach(function (s) { io.observe(s); });
+    }
+    activate(0);
+  }
 
-const state2 = `<span class="tl stub">[gfc] unchanged: "/Users/you/src/server.ts" is byte-identical to the</span>
-<span class="tl stub">full content already present earlier in this conversation</span>
-<span class="tl stub">(sha256 77ed7fe0c7ed, 47 lines, 1.6 KB). Nothing new to show —</span>
-<span class="tl stub">use read with offset/limit if you need specific lines again.</span>
-<span class="tl c">(51 tokens · the 6,412-token duplicate never happened)</span>`;
+  /* why: tiles fill, cache, collapse, then keep one real read and nine stubs */
+  var WHY = [
+    { count: '5,000 lines in context', note: 'Each read appends the whole file. Ten reads of a 500-line file are ten copies.' },
+    { count: '5,000 lines still in context', note: 'Caching makes the repeats cheaper to send. They are still there, competing for attention.' },
+    { count: '10 reads, 1 summary', note: 'Compaction replaces the copies with a summary. What it drops does not come back.' },
+    { count: '500 lines + 9 stubs', note: 'The first read stays real. Every repeat becomes a one-line stub that cites the hash.' }
+  ];
+  var whyCard = document.getElementById('why-card');
+  var whyTiles = document.getElementById('why-tiles');
+  function renderWhy(i) {
+    whyCard.setAttribute('data-state', String(i));
+    whyTiles.textContent = '';
+    if (i === 2) {
+      var s = el('div', 'tile summary');
+      s.appendChild(el('b', null, 'summary'));
+      s.appendChild(el('span', null, '10 reads compacted, detail not recoverable'));
+      s.style.setProperty('--i', '0');
+      whyTiles.appendChild(s);
+    } else {
+      for (var k = 0; k < 10; k++) {
+        var stub = i === 3 && k > 0;
+        var keep = i === 3 && k === 0;
+        var t = el('div', 'tile' + (stub ? ' stub' : '') + (keep ? ' keep' : ''));
+        t.appendChild(el('b', null, stub ? '1' : '500'));
+        t.appendChild(el('span', null, stub ? 'stub' : 'read'));
+        t.style.setProperty('--i', String(k));
+        whyTiles.appendChild(t);
+      }
+    }
+    setText('why-count', WHY[i].count);
+    setText('why-note', WHY[i].note);
+  }
+  scrolly('why', renderWhy);
 
-function state3(){
-  let h = `<span class="tl stub">[gfc] changed since the full version earlier in this conversation</span>
-<span class="tl stub">(77ed7fe0c7ed → 8f839ca60d0b). Diff of last-seen → current:</span>
-<span class="tl h">@@ -28,7 +28,7 @@</span>
-`;
-  for (let i = 25; i < 28; i++) h += L(i+1, "c", esc(lines[i]));
-  h += L(28, "r", "- " + esc(lines[27]));
-  h += L(28, "g", "+ const retries = 5   // raised for flaky upstreams");
-  for (let i = 28; i < 31; i++) h += L(i+2, "c", esc(lines[i]));
-  h += `<span class="tl c">(168 tokens · full re-read would be 6,412)</span>`;
-  return h;
-}
+  /* how: the pipeline lights up, and the detail shows the real output at that step */
+  var HOW = [
+    {
+      nodes: [0, 1],
+      html: '<p class="d-label">registry · ~/.gfc/registry.json</p>' +
+            '<p class="reg">src/server.ts   sha256 77ed7fe0c7ed   47 lines   session 1</p>' +
+            '<p class="d-note">Recorded on the full read. Later reads are checked against this hash.</p>'
+    },
+    {
+      nodes: [2],
+      html: '<p class="flow">tool output: read src/server.ts again</p>' +
+            '<p class="flow flag">gate: bytes match the registry</p>' +
+            '<p class="flow">transcript: one full read, one stub. The duplicate never gets added.</p>'
+    },
+    {
+      nodes: [3],
+      html: '<div class="two">' +
+              '<div class="card"><p class="d-label">unchanged</p><p>[GFC] unchanged: "/src/server.ts" is byte-identical to the full content already present earlier in this conversation. Nothing new to show.</p></div>' +
+              '<div class="card"><p class="d-label">changed</p>' +
+                '<div class="dl hunk">@@ -31,5 +31,5 @@</div>' +
+                '<div class="dl">  const session = auth(req)</div>' +
+                '<div class="dl del">- const retries = 3</div>' +
+                '<div class="dl add">+ const retries = 5</div>' +
+                '<div class="dl">  return handler(session)</div>' +
+              '</div>' +
+            '</div>'
+    },
+    {
+      nodes: [4],
+      html: '<div class="two">' +
+              '<div class="card"><p class="d-label">session 1</p><p>First read: full content.</p></div>' +
+              '<div class="card"><p class="d-label">session 2</p><p>First read: full content again.</p></div>' +
+            '</div>' +
+            '<p class="d-note" style="margin-top:12px">Registries are per session, so the first read in every session is always real.</p>'
+    }
+  ];
+  var howNodes = document.querySelectorAll('#how-nodes li');
+  var howDetail = document.getElementById('how-detail');
+  function renderHow(i) {
+    howNodes.forEach(function (n, j) {
+      n.classList.toggle('on', HOW[i].nodes.indexOf(j) !== -1);
+    });
+    howDetail.innerHTML = HOW[i].html;
+  }
+  scrolly('how', renderHow);
 
-function swap(html){
-  body.style.opacity = 0;
-  setTimeout(() => { body.innerHTML = html; body.style.transition = "opacity .35s"; body.style.opacity = 1; }, 180);
-}
-function active(x){ [b1,b2,b3].forEach(b=>b.classList.remove("active")); if(x) x.classList.add("active"); }
+  /* try it: one file, read with and without GFC */
+  var FILE_LINES = 47;
+  var STUB = '[GFC] unchanged: "/src/server.ts" is byte-identical to the full content already present earlier in this conversation. Nothing new to show.';
+  var state = { disk: 3, seen: null, noLines: 0, yesLines: 0 };
+  var noLog = document.getElementById('no-log');
+  var yesLog = document.getElementById('yes-log');
 
-b1.onclick = () => { swap(state1()); setTok(8254); savedEl.classList.remove("on"); active(b1); b2.disabled = false; b0.disabled = false; };
-b2.onclick = () => { swap(state2); setTok(1893); flashSaved("−6,361 tokens"); active(b2); b3.disabled = false; };
-b3.onclick = () => { swap(state3()); setTok(2001); flashSaved("−6,253 tokens"); active(b3); };
-b0.onclick = () => { swap(state0); setTok(1842); savedEl.classList.remove("on"); active(null); b2.disabled = b3.disabled = true; b0.disabled = true; };
+  function codeLine(kind, num, mark, text) {
+    var row = el('div', 'l ' + kind);
+    row.appendChild(el('span', 'ln', String(num)));
+    row.appendChild(el('span', 'mk', mark));
+    row.appendChild(el('span', 'tx', text));
+    return row;
+  }
+  function excerpt(retries) {
+    return [
+      codeLine('ctx', 31, ' ', 'const session = auth(req)'),
+      codeLine('ctx', 32, ' ', 'const timeout = 30_000'),
+      codeLine('ctx', 33, ' ', 'const retries = ' + retries),
+      codeLine('ctx', 34, ' ', 'const backoff = 250'),
+      codeLine('ctx', 35, ' ', 'return handler(session)'),
+      el('div', 'more', '… 42 more lines')
+    ];
+  }
+  function hunk(before, after) {
+    var header = el('div', 'l hunk');
+    header.appendChild(el('span', 'tx', '@@ -31,5 +31,5 @@'));
+    return [
+      header,
+      codeLine('ctx', 31, ' ', 'const session = auth(req)'),
+      codeLine('ctx', 32, ' ', 'const timeout = 30_000'),
+      codeLine('del', 33, '-', 'const retries = ' + before),
+      codeLine('add', 33, '+', 'const retries = ' + after),
+      codeLine('ctx', 34, ' ', 'const backoff = 250'),
+      codeLine('ctx', 35, ' ', 'return handler(session)')
+    ];
+  }
+  function editRows(before, after) {
+    return [el('p', 'stub', 'const retries = ' + before + '  →  const retries = ' + after)];
+  }
+  function clearPlaceholder(log) {
+    var p = log.querySelector('.empty');
+    if (p) log.textContent = '';
+  }
+  function addEntry(log, tag, nodes) {
+    clearPlaceholder(log);
+    var entry = el('div', 'entry');
+    entry.appendChild(el('span', 'tag', tag));
+    var body = el('div', 'body');
+    nodes.forEach(function (n) { body.appendChild(n); });
+    entry.appendChild(body);
+    log.appendChild(entry);
+    log.scrollTop = log.scrollHeight;
+  }
+  function updateCompare() {
+    setText('no-count', state.noLines + ' lines sent');
+    setText('yes-count', state.yesLines + ' lines sent');
+    setText('cmp-status', 'On disk: const retries = ' + state.disk + '. The model last saw ' +
+      (state.seen === null ? 'nothing yet' : 'const retries = ' + state.seen) + '.');
+  }
+  function read() {
+    // without GFC: the whole file goes in every time
+    state.noLines += FILE_LINES;
+    addEntry(noLog, 'read · full file · 47 lines', excerpt(state.disk));
 
-/* ---------- copy ---------- */
-const cmd = document.getElementById("cpcmd");
-cmd.addEventListener("click", () => {
-  navigator.clipboard.writeText("git clone https://github.com/jjjebli/gfc ~/.gfc").then(() => {
-    cmd.classList.add("copied");
-    setTimeout(() => cmd.classList.remove("copied"), 1400);
+    // with GFC: real content once, then stubs or hunks
+    if (state.seen === null) {
+      state.yesLines += FILE_LINES;
+      state.seen = state.disk;
+      addEntry(yesLog, 'read · full file · 47 lines', excerpt(state.disk));
+    } else if (state.seen === state.disk) {
+      state.yesLines += 1;
+      addEntry(yesLog, 'stub · 1 line, about 45 tokens', [el('p', 'stub', STUB)]);
+    } else {
+      var before = state.seen;
+      state.seen = state.disk;
+      state.yesLines += 6;
+      addEntry(yesLog, 'diff · 1 hunk, 6 lines', hunk(before, state.disk));
+    }
+    updateCompare();
+  }
+  function edit() {
+    var before = state.disk;
+    state.disk = before === 3 ? 5 : 3;
+    addEntry(noLog, 'edit · written by the model', editRows(before, state.disk));
+    addEntry(yesLog, 'edit · written by the model', editRows(before, state.disk));
+    updateCompare();
+  }
+  function reset() {
+    state = { disk: 3, seen: null, noLines: 0, yesLines: 0 };
+    [noLog, yesLog].forEach(function (log) {
+      log.textContent = '';
+      log.appendChild(el('p', 'empty', 'Nothing read yet.'));
+    });
+    updateCompare();
+  }
+  document.querySelector('.controls').addEventListener('click', function (e) {
+    var act = e.target && e.target.getAttribute('data-act');
+    if (act === 'read') read();
+    else if (act === 'five') { for (var k = 0; k < 5; k++) read(); }
+    else if (act === 'edit') edit();
+    else if (act === 'reset') reset();
   });
-});
-document.querySelectorAll(".panel pre.copyable").forEach(pre => {
-  pre.addEventListener("click", () => {
-    navigator.clipboard.writeText(pre.innerText).then(() => {
-      pre.style.borderColor = "var(--green)";
-      setTimeout(() => pre.style.borderColor = "", 900);
+
+  /* measured: bars fill once they are on screen */
+  var bars = document.getElementById('bars');
+  if ('IntersectionObserver' in window) {
+    var barObserver = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('in');
+          barObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.3 });
+    barObserver.observe(bars);
+  } else {
+    bars.classList.add('in');
+  }
+
+  /* copy buttons */
+  document.querySelectorAll('.copy').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var text = btn.parentNode.querySelector('code').textContent;
+      function done(ok) {
+        btn.textContent = ok ? 'Copied' : 'Copy failed';
+        setTimeout(function () { btn.textContent = 'Copy'; }, 1600);
+      }
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function () { done(true); }, function () { done(false); });
+      } else {
+        done(false);
+      }
     });
   });
-});
 
-/* ---------- reveals ---------- */
-const io = new IntersectionObserver((es) => {
-  es.forEach(e => { if (e.isIntersecting){ e.target.classList.add("in"); io.unobserve(e.target); } });
-}, { threshold: 0.08 });
-document.querySelectorAll(".rv").forEach(el => io.observe(el));
-window.addEventListener("load", () => {
-  document.querySelectorAll(".hero .rv").forEach(el => el.classList.add("in"));
-});
+  updateCompare();
+})();
 </script>
 </body>
 </html>
