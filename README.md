@@ -2,12 +2,20 @@
 
 <p align="center"><img src="docs/banner.svg" alt="gfc — git-for-context" width="720"></p>
 
-**Docs site: https://jjjebli.github.io/gfc/** — the interactive version, with a live demo of a stub replacing a full re-read.
+<p align="center">
+  <a href="https://github.com/jjjebli/gfc/actions/workflows/ci.yml"><img src="https://github.com/jjjebli/gfc/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="#measured"><img src="https://img.shields.io/badge/measured-%E2%88%9234%25%20context%2Fturn-52C489?style=flat-square" alt="measured −34% context/turn"></a>
+  <a href="package.json"><img src="https://img.shields.io/badge/dependencies-0-111413?style=flat-square" alt="zero dependencies"></a>
+  <img src="https://img.shields.io/badge/node-%E2%89%A522-111413?style=flat-square" alt="node ≥22">
+  <img src="https://img.shields.io/badge/license-MIT-111413?style=flat-square" alt="MIT">
+</p>
+
+**Docs site: https://jjjebli.github.io/gfc/** — the interactive version, where the page itself is a numbered file being read, with a live demo of a stub replacing a full re-read.
 
 LLM coding agents re-read the same files over and over. The transcript is a
 linear replay: every turn re-pays for content the model has already seen.
-gfc (git-for-context) treats the transcript like git treats a working tree —
-ship the model a **diff against what it already saw**, never a full re-checkout.
+**gfc treats the transcript like git treats a working tree — ship the model a
+diff against what it already saw, never a full re-checkout.**
 
 | What the model does | What it gets |
 |---|---|
@@ -22,7 +30,7 @@ where it pays.
 
 ## Measured
 
-72-run A/B benchmark on opencode free-tier models (3 models x 4 scenarios x 3 reps,
+72-run A/B benchmark on opencode free-tier models (3 models × 4 scenarios × 3 reps,
 fresh sessions, all attempts counted, no outlier removal). Full protocol in `bench/`.
 
 | Scenario | Per-turn context (arm A → arm B) | Delta |
@@ -38,33 +46,26 @@ Mechanism fired 9/9 in every valid run. Comprehension after a stub: 100%
 re-fetch side-effects). Registry writes are cross-process safe (lockfile +
 atomic rename; verified by a 2-process race test — 60/60 entries survive).
 
-## How it works
-
-1. **Content-addressed registry** (`~/.gfc/registry.json`): every full read is
-   hashed (sha256) and recorded per session. If on-disk content still hashes
-   to the registered value, it is byte-identical to what the model already saw.
-2. **The filesystem is the store of truth** — only a small registry and
-   last-seen content blobs (≤512KB each) are persisted, for diffing.
-3. **Session-scoped**: models are stateless across sessions, so the first full
-   read in any session always returns real content. A resumed session
-   (same session id) keeps stubbing.
-4. Compaction-aware: opencode's `/compact` receives the verified-file list so
-   summaries don't paste file contents; post-compact re-reads still stub.
+The win scales with the size of your files and how often the agent re-reads
+them. A 2000-line file re-read twice costs ~3× in tokens; with gfc it costs
+~1.05×.
 
 ## Install
 
-Requirements: Node ≥22 (or Bun). No npm dependencies.
+One command (OpenCode):
 
-### OpenCode (hard interception — plugin replaces nothing, hooks the read tool)
+```sh
+curl -fsSL https://raw.githubusercontent.com/jjjebli/gfc/master/install.sh | bash
+```
+
+That clones to `~/.gfc`, links the plugin, and prints the MCP config if you
+want Codex too. Re-run it any time to update. Manual equivalent:
 
 ```sh
 git clone https://github.com/jjjebli/gfc ~/.gfc
 mkdir -p ~/.config/opencode/plugins
-cp ~/.gfc/gfc-plugin.ts ~/.config/opencode/plugins/gfc.ts
+ln -s ~/.gfc/gfc-plugin.ts ~/.config/opencode/plugins/gfc.ts   # or cp
 ```
-
-(On the author's machine the plugin is a symlink into `~/.gfc` so `git pull`
-updates it; a copy works identically.)
 
 Restart opencode. Done — there is nothing to configure.
 
@@ -88,6 +89,28 @@ A `[gfc]` stub means "unchanged since your last full read" — trust it.
 Interactive Codex will ask to approve the tool once — choose *always allow*.
 `codex exec` needs `--approve-for-me` (headless mode auto-rejects MCP calls).
 
+### Verify
+
+Deterministic, no LLM, no network — CI runs both on every push:
+
+```sh
+GFC_HOME=$(mktemp -d) node ~/.gfc/core.mjs   # diff, registry v2, lock race
+node ~/.gfc/test.mjs                         # full MCP battery
+```
+
+## How it works
+
+1. **Content-addressed registry** (`~/.gfc/registry.json`): every full read is
+   hashed (sha256) and recorded per session. If on-disk content still hashes
+   to the registered value, it is byte-identical to what the model already saw.
+2. **The filesystem is the store of truth** — only a small registry and
+   last-seen content blobs (≤512KB each) are persisted, for diffing.
+3. **Session-scoped**: models are stateless across sessions, so the first full
+   read in any session always returns real content. A resumed session
+   (same session id) keeps stubbing.
+4. **Compaction-aware**: opencode's `/compact` receives the verified-file list so
+   summaries don't paste file contents; post-compact re-reads still stub.
+
 ## Configuration
 
 | Knob | Effect |
@@ -98,15 +121,6 @@ Interactive Codex will ask to approve the tool once — choose *always allow*.
 
 Registry entries expire after 30 days. Blobs are capped at 1000 files.
 Writes are atomic (temp file + rename) and cross-process locked.
-
-## Test
-
-```sh
-GFC_HOME=$(mktemp -d) node ~/.gfc/core.mjs   # self-test: diff, registry, lock race
-node ~/.gfc/test.mjs                         # full MCP battery (stub/diff/slices/edges)
-```
-
-Both are deterministic — no LLM, no network.
 
 ## Limitations (honest)
 
@@ -123,3 +137,7 @@ Both are deterministic — no LLM, no network.
 ## License
 
 MIT
+
+---
+
+If gfc cut your context bills, a ⭐ helps other agents' humans find it.

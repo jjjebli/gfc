@@ -1,0 +1,22 @@
+name: CI
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  test:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        node: [22, 24]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - name: Core self-test (pure + registry v2 + lock race)
+        run: GFC_HOME=$(mktemp -d) node core.mjs
+      - name: MCP server battery (stub / diff / slices / edges)
+        run: node test.mjs
