@@ -332,11 +332,11 @@ h2{font-size:clamp(30px,4vw,46px);line-height:1.08;letter-spacing:-0.03em;font-w
         </article>
         <article class="step" data-step="2">
           <h3>Return the delta.</h3>
-          <p>Unchanged gives a ~45-token stub that cites the hash. Changed gives a unified diff from last-seen to current. Slice reads always pass through, with a note if the file has drifted.</p>
+          <p>Unchanged gives a ~70-token stub that cites the hash, including for unchanged pages of large files. Changed gives a numbered, multi-hunk diff from last-seen to current. Reads with offset or limit always return real lines, with a note if the file has drifted.</p>
         </article>
         <article class="step" data-step="3">
           <h3>Scope to the session.</h3>
-          <p>Models are stateless, so the first full read in any session is always real content. No stub can hide something the model hasn’t seen. Compaction receives the verified-file list, so summaries stay lean.</p>
+          <p>Models are stateless, so the first read in any session is always real content. No stub can hide something the model hasn’t seen. On compaction, summaries are told not to paste file contents, and GFC forgets the session, so the next read is real content again.</p>
         </article>
       </div>
     </div>
@@ -368,7 +368,7 @@ h2{font-size:clamp(30px,4vw,46px);line-height:1.08;letter-spacing:-0.03em;font-w
           <div class="transcript" id="yes-log" role="log"><p class="empty">Nothing read yet.</p></div>
         </div>
       </div>
-      <p class="fineprint">Counts lines sent to the model, not tokens. A stub is one line here, though it costs about 45 tokens.</p>
+      <p class="fineprint">Counts lines sent to the model, not tokens. A stub is one line here, though it costs about 70 tokens.</p>
     </div>
   </section>
 
@@ -486,8 +486,8 @@ args = ["/Users/you/.GFC/mcp.mjs"]</code></pre>
       </div>
       <div class="ceil">
         <details>
-          <summary><span class="m">−</span><span>Diffs are single-hunk.</span><span class="tog"></span></summary>
-          <p>Scattered edits fall back to full content when the diff would be larger. A Myers upgrade happens only when that measurably hurts.</p>
+          <summary><span class="m">−</span><span>Large rewrites get full content.</span><span class="tog"></span></summary>
+          <p>Diffs are multi-hunk (Myers), but past ~1000 changed lines, or when the diff would be over 80% of the file, the full content is sent instead. Diffs also apply only when the whole previous version was read.</p>
         </details>
         <details>
           <summary><span class="m">−</span><span>Files over 512 KB are never diffed.</span><span class="tog"></span></summary>
@@ -495,7 +495,7 @@ args = ["/Users/you/.GFC/mcp.mjs"]</code></pre>
         </details>
         <details>
           <summary><span class="m">−</span><span>The OpenCode hook depends on output mutation.</span><span class="tog"></span></summary>
-          <p>It relies on <code>tool.execute.after</code> output mutation, verified on opencode 1.18.29. If a future version stops persisting it, the fallback is <code>experimental.chat.messages.transform</code> as a send-time rewriter.</p>
+          <p>It relies on <code>tool.execute.after</code> output mutation, checked against the opencode 1.19.0 source. If the read format changes, verification fails closed: output passes through untouched. OpenCode’s unreleased 2.x plugin API will need a port.</p>
         </details>
         <details>
           <summary><span class="m">−</span><span>No savings without re-reads.</span><span class="tog"></span></summary>
@@ -731,7 +731,7 @@ args = ["/Users/you/.GFC/mcp.mjs"]</code></pre>
       addEntry(yesLog, 'read · full file · 47 lines', excerpt(state.disk));
     } else if (state.seen === state.disk) {
       state.yesLines += 1;
-      addEntry(yesLog, 'stub · 1 line, about 45 tokens', [el('p', 'stub', STUB)]);
+      addEntry(yesLog, 'stub · 1 line, about 70 tokens', [el('p', 'stub', STUB)]);
     } else {
       var before = state.seen;
       state.seen = state.disk;

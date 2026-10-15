@@ -19,10 +19,15 @@ diff against what it already saw, never a full re-checkout.**
 
 | What the model does | What it gets |
 |---|---|
-| First full read of a file | Full numbered content (always) |
-| Re-reads an **unchanged** file | A tiny `[GFC] unchanged` stub (~45 tokens, hash-verifiable) |
-| Re-reads a **changed** file | A unified diff of last-seen → current |
-| Reads a slice (offset/limit) | The real lines — plus a change-note if the file drifted |
+| First read of a file | Full numbered content (always) |
+| Re-reads an **unchanged** file — or an unchanged *page* of a large one | A tiny `[GFC] unchanged` stub (~70 tokens, hash-verifiable) |
+| Re-reads a **changed** file | A numbered multi-hunk diff of last-seen → current |
+| Reads with offset/limit | **Always** the real lines — plus a change-note if the file drifted |
+| Reads anything after **compaction** | Real content again (GFC forgets what was compacted away) |
+
+The guarantee GFC is built around: **a stub never points at content the
+model doesn't have.** If the model is ever unsure, `offset=1` is an escape
+hatch that always returns the real lines — and every stub says so.
 
 Zero per-turn overhead: no tools registered in OpenCode, no prompt additions.
 Nothing happens unless a duplicate read was about to happen — which is exactly
@@ -49,6 +54,13 @@ atomic rename; verified by a 2-process race test — 60/60 entries survive).
 The win scales with the size of your files and how often the agent re-reads
 them. A 2000-line file re-read twice costs ~3× in tokens; with GFC it costs
 ~1.05×.
+
+*The A/B numbers above were measured on v0.1.* v0.2 extends the mechanism to
+cases v0.1 passed through untouched — re-reads of files over 50 KB (which
+OpenCode pages) and multi-site edits (which v0.1 re-sent in full). On a
+deterministic replay of OpenCode 1.19's read output (a 40 KB file re-read and
+edited in two places, plus a 95 KB file re-read twice), context drops 33% with
+v0.1 and 62% with v0.2. Re-run `bench/` for model-level numbers.
 
 ## Install
 
@@ -89,48 +101,84 @@ A `[GFC]` stub means "unchanged since your last full read" — trust it.
 Interactive Codex will ask to approve the tool once — choose *always allow*.
 `codex exec` needs `--approve-for-me` (headless mode auto-rejects MCP calls).
 
+Pin a release instead of tracking `master`:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/jjjebli/gfc/master/install.sh | GFC_REF=v0.2.0 bash
+```
+
 ### Verify
 
 Deterministic, no LLM, no network — CI runs both on every push:
 
 ```sh
-GFC_HOME=$(mktemp -d) node ~/.gfc/core.mjs   # diff, registry v2, lock race
-node ~/.gfc/test.mjs                         # full MCP battery
+cd ~/.gfc && npm test
+# core.mjs: diff (incl. 300 randomized apply-round-trips), decide(), registry, privacy, lock race
+# test.mjs: MCP server over stdio + OpenCode plugin against 1.x read-tool output (Node ≥22.18)
 ```
 
 ## How it works
 
-1. **Content-addressed registry** (`~/.gfc/registry.json`): every full read is
-   hashed (sha256) and recorded per session. If on-disk content still hashes
-   to the registered value, it is byte-identical to what the model already saw.
-2. **The filesystem is the store of truth** — only a small registry and
-   last-seen content blobs (≤512KB each) are persisted, for diffing.
-3. **Session-scoped**: models are stateless across sessions, so the first full
-   read in any session always returns real content. A resumed session
-   (same session id) keeps stubbing.
-4. **Compaction-aware**: opencode's `/compact` receives the verified-file list so
-   summaries don't paste file contents; post-compact re-reads still stub.
+1. **Content-addressed registry** (`~/.gfc/registry.json`): per session and
+   file, GFC records the sha256 of the content and how far (`upto`) the model
+   has read it. If on-disk content still hashes to the registered value, the
+   lines the model saw are byte-identical to what's on disk now. Paging forward
+   through a large file extends `upto`.
+2. **Verified before trusted**: the OpenCode plugin only registers a read after
+   checking that the rows the model was shown match the file on disk, so an
+   edit landing between the read and the hook can't produce a false stub.
+3. **One decision procedure**: the plugin and the MCP server share
+   `core.decide()`, so both front-ends have identical, unit-tested semantics.
+4. **Session-scoped**: models are stateless across sessions, so the first read
+   in any session always returns real content. A resumed session (same
+   session id) keeps stubbing.
+5. **Compaction-aware**: on OpenCode's `/compact`, the summary is told not to
+   paste file contents, and the session's registry is cleared — the next read
+   of any file returns its real content.
+6. **Diffs built for the reader**: Myers line diff, multiple hunks, every line
+   numbered (old numbers on `-` lines, current numbers on context and `+`
+   lines) so the model can edit straight from the diff. Used only when it's
+   under 80% of the full output; otherwise the full content is sent.
 
 ## Configuration
 
 | Knob | Effect |
 |---|---|
 | `GFC_HOME=/dir` | Relocate all state (and, if the clone lives there, the code) |
+| `GFC_REF=<tag>` | (install.sh) pin the install to a tag or commit |
 | `GFC_DEBUG=1` | Trace hook decisions to `~/.gfc/debug.log` |
 | `rm -rf ~/.gfc` | Full reset — rebuilds on next read; costs one full read per file |
 
-Registry entries expire after 30 days. Blobs are capped at 1000 files.
-Writes are atomic (temp file + rename) and cross-process locked.
+Registry entries and blobs expire after 30 days; blobs are also capped at 1000
+files (least-recently-used first). Writes are atomic (temp file + rename) and
+cross-process locked.
+
+### Privacy
+
+To diff a changed file, GFC must remember the last version the model saw, so
+**it stores copies of file contents** (≤512 KB each) in `~/.gfc/store`. These
+are written owner-only (`0600` in a `0700` directory). Files that look like
+secrets — `.env*`, `*.pem`/`*.key`/keystores, `id_rsa`-style keys, `.npmrc`,
+`.netrc`, anything named `*secret*` or `*credential*` — are **never stored**:
+they still stub when unchanged, but a change returns full content instead of
+a diff. `rm -rf ~/.gfc` erases everything.
 
 ## Limitations (honest)
 
-- Diffs are single-hunk (common prefix/suffix). Scattered edits fall back to
-  full content when the diff would be larger.
+- Edits beyond ~1000 changed lines are treated as a rewrite (full content).
 - Files >512KB are never diffed (full re-read on change) and binary files are
   rejected by the MCP tool.
-- The OpenCode hook relies on `tool.execute.after` output mutation, verified
-  on opencode 1.18.29; if a future version stops persisting mutations, the
-  fallback is `experimental.chat.messages.transform` as a send-time rewriter.
+- Diffs apply only when the model had seen the whole previous file; a changed
+  file that was only partly read returns real lines with a change-note.
+- The MCP server can't observe client-side compaction. Its stubs tell the
+  model to use `offset=1` if the content is gone; the OpenCode plugin handles
+  compaction automatically.
+- The OpenCode hook relies on `tool.execute.after` output mutation and the 1.x
+  read-tool format, checked against the opencode 1.19.0 source (end-to-end on
+  1.18.29). If the format changes, verification fails closed: output passes
+  through untouched and nothing is stubbed. OpenCode's unreleased 2.x rewrite
+  has a new plugin API; when it ships, GFC will need a port (or
+  `experimental.chat.messages.transform` as a send-time rewriter).
 - Free-tier prompt caching is nondeterministic; use per-turn context totals,
   not raw input sums, when benchmarking (see `bench/analyze.mjs`).
 
