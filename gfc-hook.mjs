@@ -316,7 +316,7 @@ function postBash(ev) {
   if (!f || f.hash !== pending.hash) return null; // changed while running: register nothing
 
   if (pending.upto !== null) {
-    if (pending.upto >= f.total) core.saveBlob(f.hash, f.content, f.stat.size, f.real);
+    if (pending.upto >= f.total) core.saveBlob(f.hash, f.content, f.stat.size, f.real, ev.cwd);
     const entry = { hash: f.hash, lines: f.total, upto: pending.upto, ts: Date.now() };
     if (pending.action === "stub" || pending.action === "diff") entry.lastStub = pending.key;
     core.putEntry(pending.sid, f.real, entry);
@@ -361,7 +361,7 @@ function postRead(ev) {
   const explicit = ev.tool_input?.offset != null || ev.tool_input?.limit != null;
   const { upto } = core.decide({ prev, hash: f.hash, total: f.total, from, to, explicit, outputLength: 0 });
   if (upto === null) return null;
-  if (upto >= f.total) core.saveBlob(f.hash, f.content, f.stat.size, f.real);
+  if (upto >= f.total) core.saveBlob(f.hash, f.content, f.stat.size, f.real, ev.cwd);
   core.putEntry(ev.session_id, f.real, { hash: f.hash, lines: f.total, upto, ts: Date.now() });
   return null;
 }

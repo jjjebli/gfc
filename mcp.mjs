@@ -99,7 +99,7 @@ function gfcRead(args) {
   const prev = core.getEntry(core.loadRegistry(), SID, real);
   const { action, upto } = core.decide({ prev, hash, total, from, to, explicit, outputLength: output.length });
   if (upto !== null) {
-    if (upto >= total) core.saveBlob(hash, content, stat.size, real); // full content seen → diffable later
+    if (upto >= total) core.saveBlob(hash, content, stat.size, real, process.cwd()); // full content seen → diffable later
     core.putEntry(SID, real, { hash, lines: total, upto, ts: Date.now() });
   }
 

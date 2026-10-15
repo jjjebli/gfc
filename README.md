@@ -205,7 +205,10 @@ are written owner-only (`0600` in a `0700` directory). Files that look like
 secrets — `.env*`, `*.pem`/`*.key`/keystores, `id_rsa`-style keys, `.npmrc`,
 `.netrc`, anything named `*secret*` or `*credential*` — are **never stored**:
 they still stub when unchanged, but a change returns full content instead of
-a diff. `rm -rf ~/.gfc` erases everything.
+a diff. Storage is also **scoped to the current project directory**: files read
+from outside the project are stubbed by hash but never copied to disk, so
+reading a file anywhere on your machine never leaves a plaintext copy in
+`~/.gfc`. `rm -rf ~/.gfc` erases everything.
 
 ## Limitations (honest)
 

@@ -110,7 +110,7 @@ function interceptRead(input: any, output: any) {
   if (DEBUG) debug(`decide ${real} ${range.from}-${range.to}/${total} explicit=${explicit} → ${action} upto=${upto}`);
 
   if (upto !== null) {
-    if (upto >= total) core.saveBlob(hash, content, stat.size, real);
+    if (upto >= total) core.saveBlob(hash, content, stat.size, real, directory);
     core.putEntry(sid, real, { hash, lines: total, upto, ts: Date.now() });
   }
 

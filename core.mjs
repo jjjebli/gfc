@@ -356,10 +356,24 @@ export function clearSession(sid) {
   });
 }
 
-export function saveBlob(hash, content, size, filePath = "") {
+/** True when `target` is `root` itself or inside it. Realpaths when both
+ *  exist (symlinks like macOS /var), otherwise compares resolved paths. */
+function isWithin(root, target) {
+  let r = null, t = null;
+  try { r = fs.realpathSync(root); } catch {}
+  try { t = fs.realpathSync(target); } catch {}
+  if (!r || !t) {
+    r = path.resolve(root);
+    t = path.resolve(target);
+  }
+  return t === r || t.startsWith(r + path.sep);
+}
+
+export function saveBlob(hash, content, size, filePath = "", projectRoot = "") {
   try {
     if (size > MAX_BLOB) return;
     if (filePath && isSensitive(filePath)) return;
+    if (projectRoot && filePath && !isWithin(projectRoot, filePath)) return;
     ensureHome();
     fs.mkdirSync(STORE_DIR, { recursive: true, mode: 0o700 });
     const p = path.join(STORE_DIR, hash);
@@ -571,6 +585,15 @@ if (isMain && !process.env.GFC_CHILD_RACE) {
     ok(readBlob("secretblob") === null, "sensitive file never stored");
     saveBlob("plainblob", "hello", 5, "/p/a.txt");
     ok(readBlob("plainblob") === "hello" && (fs.statSync(path.join(STORE_DIR, "plainblob")).mode & 0o077) === 0, "blob private");
+
+    saveBlob("inroot", "ok", 2, path.join(GFC_HOME, "src/a.ts"), GFC_HOME);
+    ok(readBlob("inroot") === "ok", "blob stored inside project root");
+    saveBlob("outroot", "x", 1, "/elsewhere/b.txt", GFC_HOME);
+    ok(readBlob("outroot") === null, "blob outside project root never stored");
+    saveBlob("atroot", "y", 1, GFC_HOME, GFC_HOME);
+    ok(readBlob("atroot") === "y", "file at the project root boundary is stored");
+    saveBlob("noroot", "z", 1, "/anywhere.txt");
+    ok(readBlob("noroot") === "z", "no root given: store (legacy callers)");
 
     const self = process.argv[1];
     const kids = [0, 1].map((i) => {

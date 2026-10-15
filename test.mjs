@@ -24,7 +24,7 @@ const ok = (c, msg) => {
 
 // ------------------------------------------------------------ MCP harness
 function startServer() {
-  const child = spawn(process.execPath, [here("./mcp.mjs")], { env: process.env });
+  const child = spawn(process.execPath, [here("./mcp.mjs")], { env: process.env, cwd: FX });
   let idc = 0;
   const pending = new Map();
   readline.createInterface({ input: child.stdout }).on("line", (line) => {
