@@ -394,6 +394,66 @@ async function hookBattery() {
   fs.rmSync(P, { recursive: true, force: true });
 }
 
+
+// ---------------------------------------------------- installer battery
+async function setupBattery() {
+  const { run } = await import(here("./setup.mjs"));
+  const H = fs.mkdtempSync(path.join(os.tmpdir(), "gfc-home-"));
+  const env = { HOME: H, PATH: process.env.PATH };
+  const quiet = () => {};
+  const claudeFile = path.join(H, ".claude", "settings.json");
+  const codexFile = path.join(H, ".codex", "hooks.json");
+  const ocFile = path.join(H, ".config", "opencode", "plugins", "gfc.ts");
+
+  // user already has settings + their own hooks
+  fs.mkdirSync(path.join(H, ".claude"), { recursive: true });
+  const mine = { model: "opus", hooks: { PreToolUse: [{ matcher: "Bash", hooks: [{ type: "command", command: "my-guard.sh" }] }] } };
+  fs.writeFileSync(claudeFile, JSON.stringify(mine));
+  fs.mkdirSync(path.join(H, ".codex"), { recursive: true });
+  fs.mkdirSync(path.join(H, ".config", "opencode"), { recursive: true });
+
+  ok(run([], env, quiet) === 0, "setup: auto-detect run succeeds");
+  const c = JSON.parse(fs.readFileSync(claudeFile, "utf8"));
+  ok(c.model === "opus" && c.hooks.PreToolUse.some((g) => g.hooks[0].command === "my-guard.sh"), "setup: user's settings and hooks kept");
+  const gfcCmd = (groups) => (groups ?? []).flatMap((g) => g.hooks).filter((h) => h.command.includes("gfc-hook.mjs"));
+  ok(gfcCmd(c.hooks.PreToolUse).length === 1 && gfcCmd(c.hooks.PostToolUse).length === 1, "setup: Claude Code Pre/Post hooks added");
+  ok(c.hooks.PostToolUse.find((g) => gfcCmd([g]).length).matcher === "Bash|Read", "setup: Claude Code also registers Read");
+  ok(gfcCmd(c.hooks.PreCompact).length === 1 && gfcCmd(c.hooks.SessionStart).length === 1, "setup: Claude Code compaction hooks added");
+  ok(fs.existsSync(claudeFile + ".gfc-backup"), "setup: backup written");
+
+  const x = JSON.parse(fs.readFileSync(codexFile, "utf8"));
+  ok(Object.keys(x).every((k) => ["description", "hooks"].includes(k)), "setup: Codex hooks.json has only allowed top-level keys");
+  ok(gfcCmd(x.hooks.PreToolUse).length === 1 && gfcCmd(x.hooks.PreCompact).length === 1 && !x.hooks.SessionStart, "setup: Codex hooks added");
+  ok(fs.lstatSync(ocFile).isSymbolicLink(), "setup: OpenCode plugin linked");
+
+  // the installed command really runs the hook
+  const cmd = gfcCmd(x.hooks.PreToolUse)[0].command;
+  const r = spawnSync("bash", ["-c", cmd], { input: "{}", encoding: "utf8", env: { ...process.env, GFC_HOME: GFC } });
+  ok(r.status === 0 && r.stdout === "", "setup: installed hook command executes");
+
+  // idempotent
+  const snap = fs.readFileSync(claudeFile, "utf8") + fs.readFileSync(codexFile, "utf8");
+  run([], env, quiet);
+  ok(fs.readFileSync(claudeFile, "utf8") + fs.readFileSync(codexFile, "utf8") === snap, "setup: second run changes nothing");
+
+  // uninstall removes only GFC
+  ok(run(["--uninstall"], env, quiet) === 0, "setup: uninstall succeeds");
+  const u = JSON.parse(fs.readFileSync(claudeFile, "utf8"));
+  ok(JSON.stringify(u) === JSON.stringify(mine), "setup: uninstall restores the user's exact settings");
+  ok(!JSON.parse(fs.readFileSync(codexFile, "utf8")).hooks && !fs.existsSync(ocFile), "setup: Codex + OpenCode cleaned");
+
+  // a config it can't parse is never touched
+  fs.writeFileSync(claudeFile, "{ this is not json");
+  ok(run(["--claude"], env, quiet) === 1 && fs.readFileSync(claudeFile, "utf8") === "{ this is not json", "setup: unparsable config left untouched");
+
+  // dry run writes nothing; nothing detected → nothing written
+  const H2 = fs.mkdtempSync(path.join(os.tmpdir(), "gfc-home-"));
+  run(["--codex", "--dry-run"], { HOME: H2, PATH: process.env.PATH }, quiet);
+  ok(!fs.existsSync(path.join(H2, ".codex")), "setup: dry run writes nothing");
+  fs.rmSync(H, { recursive: true, force: true });
+  fs.rmSync(H2, { recursive: true, force: true });
+}
+
 try {
   await mcpBattery();
   console.log(`GFC mcp battery: passed`);
@@ -408,6 +468,8 @@ try {
   }
   await hookBattery();
   console.log(`GFC hook battery (Claude Code + Codex): passed`);
+  await setupBattery();
+  console.log(`GFC installer battery: passed`);
   console.log(`GFC test.mjs: ALL ${checks} CHECKS PASSED`);
 } catch (e) {
   console.error("FAILED:", e.message);

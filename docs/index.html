@@ -422,30 +422,27 @@ h2{font-size:clamp(30px,4vw,46px);line-height:1.08;letter-spacing:-0.03em;font-w
 
   <section class="section" id="install" aria-labelledby="install-title">
     <div class="wrap">
-      <h2 id="install-title">Install in two commands.</h2>
-      <p class="intro" style="margin-bottom:48px">Two integration paths. The plugin is enforced. The MCP server is advisory.</p>
+      <h2 id="install-title">Install in one command.</h2>
+      <p class="intro" style="margin-bottom:48px">It finds OpenCode, Claude Code and Codex on your machine and wires each one. Your own settings and hooks are kept, and every changed file is backed up.</p>
       <div class="install">
         <div>
-          <h3>OpenCode plugin</h3>
-          <p class="mode">Hard interception. Hooks the read tool. Automatic, invisible, enforced.</p>
+          <h3>OpenCode, Claude Code, Codex</h3>
+          <p class="mode">Automatic. A plugin for OpenCode’s read tool, hooks for shell reads in Claude Code and Codex.</p>
           <div class="code">
             <button class="copy" type="button">Copy</button>
-            <pre><code>git clone https://github.com/jjjebli/gfc ~/.gfc
-cp ~/.gfc/gfc-plugin.ts ~/.config/opencode/plugins/gfc.ts</code></pre>
+            <pre><code>curl -fsSL https://raw.githubusercontent.com/jjjebli/gfc/master/install.sh | bash</code></pre>
           </div>
-          <p class="after">Then restart OpenCode. There is nothing else to configure. You’ll see <code>[GFC]</code> stubs where duplicates used to be. Symlink the plugin instead of copying it, and <code>git pull</code> becomes your update path.</p>
+          <p class="after">Restart your agent. In Codex, type <code>/hooks</code> once and trust the GFC hooks. Re-run to update; <code>--uninstall</code> removes GFC and leaves your own hooks alone.</p>
         </div>
         <div>
-          <h3>MCP server</h3>
+          <h3>Any other MCP client</h3>
           <p class="mode">Advisory. Adds a <code>gfc_read</code> tool that your agent is instructed to prefer.</p>
           <div class="code">
             <button class="copy" type="button">Copy</button>
-            <pre><code># ~/.codex/config.toml
-[mcp_servers.gfc]
-command = "node"
-args = ["/Users/you/.GFC/mcp.mjs"]</code></pre>
+            <pre><code>command: node
+args: ["/Users/you/.gfc/mcp.mjs"]</code></pre>
           </div>
-          <p class="after">In interactive Codex, approve <code>gfc_read</code> once and always allow it. For <code>codex exec</code>, add <code>--approve-for-me</code>. A recommended rule for <code>~/.codex/AGENTS.md</code>: prefer <code>gfc_read</code> over <code>cat</code>, <code>head</code>, <code>sed</code>, and <code>tail</code>.</p>
+          <p class="after">Works with Cursor, Gemini CLI, Windsurf and other MCP clients. Add a rule such as “prefer <code>gfc_read</code> over <code>cat</code>, <code>head</code>, <code>sed</code>, and <code>tail</code>” to your agent instructions.</p>
         </div>
       </div>
     </div>
