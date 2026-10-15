@@ -1,10 +1,11 @@
 {
   "name": "gfc",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "git-for-context — LLM context dedup: unchanged file re-reads collapse to hash-verified stubs, changed files return diffs. OpenCode plugin + MCP server, zero dependencies.",
   "type": "module",
   "bin": { "gfc-mcp": "./mcp.mjs" },
   "files": ["core.mjs", "mcp.mjs", "gfc-plugin.ts", "test.mjs"],
+  "scripts": { "test": "GFC_HOME=$(mktemp -d) node core.mjs && node test.mjs" },
   "keywords": ["llm", "context", "tokens", "dedup", "mcp", "opencode", "codex"],
   "license": "MIT",
   "repository": "https://github.com/jjjebli/gfc",
