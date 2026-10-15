@@ -265,6 +265,135 @@ async function pluginBattery() {
   ok((await read("S2", f)).startsWith("[GFC]"), "plugin: compaction of S1 leaves S2's knowledge intact");
 }
 
+
+// ------------------------------------------------------ hook harness
+// Drives gfc-hook.mjs exactly like Claude Code / Codex: PreToolUse (may
+// rewrite the command) → the command really runs in bash → PostToolUse.
+import { spawnSync, execFileSync } from "node:child_process";
+
+function hookCall(ev) {
+  const r = spawnSync(process.execPath, [here("./gfc-hook.mjs")], { input: JSON.stringify(ev), env: process.env, encoding: "utf8" });
+  assert.equal(r.status, 0, "hook exits 0");
+  return r.stdout ? JSON.parse(r.stdout) : null;
+}
+
+let toolUse = 0;
+function agentRun(session_id, command, cwd, { between } = {}) {
+  const tool_use_id = `toolu_${++toolUse}`;
+  const pre = hookCall({ hook_event_name: "PreToolUse", session_id, cwd, tool_name: "Bash", tool_use_id, tool_input: { command } });
+  if (pre) {
+    const h = pre.hookSpecificOutput;
+    // Codex contract: allow only together with updatedInput; never ask/approve
+    assert.equal(h.permissionDecision, "allow");
+    assert.ok(h.updatedInput?.command, "allow carries updatedInput");
+  }
+  const ran = pre?.hookSpecificOutput.updatedInput.command ?? command;
+  if (between) between();
+  const stdout = execFileSync("bash", ["-c", ran], { cwd, encoding: "utf8" });
+  const post = hookCall({
+    hook_event_name: "PostToolUse", session_id, cwd, tool_name: "Bash", tool_use_id,
+    tool_input: { command: ran }, tool_response: { stdout, stderr: "", interrupted: false },
+  });
+  return { stdout, rewritten: !!pre, note: post?.hookSpecificOutput?.additionalContext ?? null };
+}
+
+async function hookBattery() {
+  const P = fs.mkdtempSync(path.join(os.tmpdir(), "gfc-proj-"));
+  const f = path.join(P, "server.ts");
+  fs.writeFileSync(f, lines(300, 30));
+  const run = (cmd, o) => agentRun("C1", cmd, P, o);
+
+  // Codex-style chunked reading
+  const r1 = run("sed -n '1,200p' server.ts");
+  ok(!r1.rewritten && r1.stdout.includes("line 0200") && !r1.stdout.includes("line 0201"), "hook: first chunk is real");
+  const r2 = run("sed -n '1,200p' server.ts");
+  ok(r2.rewritten && r2.stdout.startsWith("[GFC] unchanged: lines 1-200") && r2.stdout.length < 400, "hook: repeated chunk = stub");
+  ok(r2.stdout.includes("run the exact same command again"), "hook: stub names the escape hatch");
+  const r3 = run("sed -n '1,200p' server.ts");
+  ok(!r3.rewritten && r3.stdout.includes("line 0200"), "hook: asking again right after a stub = real output");
+  ok(run("sed -n '1,200p' server.ts").stdout.startsWith("[GFC] unchanged"), "hook: …and stubs resume after that");
+  ok(!run("sed -n '201,300p' server.ts").rewritten, "hook: next chunk is real");
+  ok(run("cat server.ts").stdout.startsWith('[GFC] unchanged: "'), "hook: contiguous chunks count as the whole file");
+  ok(run("nl -ba server.ts | sed -n '40,90p'").stdout.startsWith("[GFC] unchanged: lines 40-90"), "hook: nl|sed of seen lines = stub");
+  ok(run("head -n 120 server.ts").stdout.startsWith("[GFC] unchanged"), "hook: head of seen lines = stub");
+
+  // other session, non-read commands
+  ok(!agentRun("C2", "cat server.ts", P).rewritten, "hook: other session gets real content");
+  const pendingBefore = fs.readdirSync(path.join(GFC, "pending")).length;
+  ok(!agentRun("C1", "ls -la", P).rewritten && !agentRun("C1", "cat server.ts > /dev/null", P).rewritten, "hook: non-read commands untouched");
+  ok(fs.readdirSync(path.join(GFC, "pending")).length === pendingBefore, "hook: no bookkeeping for non-reads");
+
+  // edits → numbered diff; same command again → full file
+  fs.writeFileSync(f, lines(300, 30).replace("line 0042" + "x".repeat(30), "line 0042 EDITED").replace("line 0250" + "x".repeat(30), "line 0250 EDITED"));
+  const d = run("cat server.ts");
+  ok(d.rewritten && d.stdout.startsWith("[GFC] changed") && (d.stdout.match(/^@@ /gm) || []).length === 2, "hook: changed file = 2-hunk diff");
+  ok(d.stdout.includes("+ 42: line 0042 EDITED") && d.stdout.length < 2000, "hook: diff is numbered and small");
+  const full = run("cat server.ts");
+  ok(!full.rewritten && full.stdout.includes("line 0250 EDITED") && full.stdout.includes("line 0001"), "hook: same command after a diff = whole file");
+  ok(run("cat server.ts").stdout.startsWith("[GFC] unchanged"), "hook: then stubs again");
+
+  // changed + partial read → real lines + change note
+  fs.writeFileSync(f, fs.readFileSync(f, "utf8").replace("line 0015", "line 0015 AGAIN"));
+  const part = run("sed -n '10,20p' server.ts");
+  ok(!part.rewritten && part.stdout.includes("line 0015 AGAIN") && part.note?.startsWith("[GFC] note"), "hook: changed slice = real + note");
+
+  // race: file changes while the command runs → nothing registered
+  const g = path.join(P, "race.ts");
+  fs.writeFileSync(g, lines(200, 30));
+  agentRun("R", "cat race.ts", P, { between: () => fs.writeFileSync(g, lines(200, 30).replace("line 0100", "line 0100 X")) });
+  ok(!agentRun("R", "cat race.ts", P).rewritten, "hook: changed-while-running read was not registered (no false stub)");
+
+  // compaction (Claude Code + Codex: PreCompact; Claude Code: SessionStart compact)
+  hookCall({ hook_event_name: "PreCompact", session_id: "C1", cwd: P, trigger: "auto" });
+  ok(!run("cat server.ts").rewritten, "hook: after PreCompact, real content");
+  ok(run("cat server.ts").stdout.startsWith("[GFC] unchanged"), "hook: stubs resume after compaction");
+  hookCall({ hook_event_name: "SessionStart", session_id: "C1", cwd: P, source: "compact" });
+  ok(!run("cat server.ts").rewritten, "hook: SessionStart(compact) also clears");
+  ok(hookCall({ hook_event_name: "SessionStart", session_id: "C1", cwd: P, source: "startup" }) === null, "hook: SessionStart prints nothing");
+
+  // file outside the project: stubs fine, but a diff (new content) is never printed by rewrite
+  const outside = path.join(FX, "outside.ts");
+  fs.writeFileSync(outside, lines(300, 30));
+  agentRun("O", `cat ${outside}`, P);
+  ok(agentRun("O", `cat ${outside}`, P).stdout.startsWith("[GFC] unchanged"), "hook: outside-project file still stubs");
+  fs.writeFileSync(outside, lines(300, 30).replace("line 0007", "line 0007 Z"));
+  const od = agentRun("O", `cat ${outside}`, P);
+  ok(!od.rewritten && od.stdout.includes("line 0007 Z") && od.note, "hook: outside-project change = real output + note, no rewrite");
+
+  // tiny files never stub; secrets never stored
+  fs.writeFileSync(path.join(P, "tiny.txt"), "a\nb\n");
+  agentRun("T", "cat tiny.txt", P);
+  ok(!agentRun("T", "cat tiny.txt", P).rewritten, "hook: tiny file never stubs");
+  fs.writeFileSync(path.join(P, ".env"), "TOKEN=hook-secret-xyz\n".repeat(200));
+  agentRun("E", "cat .env", P);
+  ok(agentRun("E", "cat .env", P).stdout.startsWith("[GFC] unchanged"), "hook: .env stubs");
+  const leaked = fs.readdirSync(path.join(GFC, "store")).some((x) => fs.readFileSync(path.join(GFC, "store", x), "utf8").includes("hook-secret-xyz"));
+  ok(!leaked, "hook: secret never written to the store");
+
+  // Claude Code Read registers (verified) → a later cat stubs; a mismatched Read does not
+  const k = path.join(P, "k.ts");
+  fs.writeFileSync(k, lines(250, 30));
+  const content = fs.readFileSync(k, "utf8");
+  hookCall({ hook_event_name: "PostToolUse", session_id: "K", cwd: P, tool_name: "Read", tool_use_id: "r1",
+    tool_input: { file_path: k }, tool_response: { type: "text", file: { filePath: k, content, numLines: 250, startLine: 1, totalLines: 250 } } });
+  ok(agentRun("K", "cat k.ts", P).stdout.startsWith("[GFC] unchanged"), "hook: Read then cat = stub");
+  hookCall({ hook_event_name: "PostToolUse", session_id: "K2", cwd: P, tool_name: "Read", tool_use_id: "r2",
+    tool_input: { file_path: k }, tool_response: { type: "text", file: { filePath: k, content: content.replace("line 0003", "stale"), numLines: 250, startLine: 1, totalLines: 250 } } });
+  ok(!agentRun("K2", "cat k.ts", P).rewritten, "hook: Read that doesn't match disk is not trusted");
+  ok(hookCall({ hook_event_name: "PostToolUse", session_id: "K", cwd: P, tool_name: "Read", tool_use_id: "r3",
+    tool_input: { file_path: k }, tool_response: { type: "file_unchanged", file: { filePath: k } } }) === null, "hook: native file_unchanged left alone");
+
+  // garbage in → silent pass, exit 0
+  for (const junk of ["", "not json", "{}", JSON.stringify({ hook_event_name: "PreToolUse", tool_name: "Bash", tool_input: {} })]) {
+    const r = spawnSync(process.execPath, [here("./gfc-hook.mjs")], { input: junk, encoding: "utf8" });
+    ok(r.status === 0 && r.stdout === "", `hook: garbage input fails open (${JSON.stringify(junk).slice(0, 20)})`);
+  }
+
+  ok(fs.readdirSync(path.join(GFC, "pending")).length === 0, "hook: no pending files left behind");
+  ok(!fs.existsSync(path.join(GFC, "out")) || fs.readdirSync(path.join(GFC, "out")).length === 0, "hook: no output files left behind");
+  fs.rmSync(P, { recursive: true, force: true });
+}
+
 try {
   await mcpBattery();
   console.log(`GFC mcp battery: passed`);
@@ -277,6 +406,8 @@ try {
     if (process.env.GFC_REQUIRE_PLUGIN_TESTS) throw new Error(msg);
     console.warn(`GFC ${msg}`);
   }
+  await hookBattery();
+  console.log(`GFC hook battery (Claude Code + Codex): passed`);
   console.log(`GFC test.mjs: ALL ${checks} CHECKS PASSED`);
 } catch (e) {
   console.error("FAILED:", e.message);

@@ -224,7 +224,7 @@ export function decide({ prev, hash, total, from, to, explicit, outputLength }) 
 
   let action = "pass";
   if (!explicit && same && prevUpto >= to && to >= 1 && outputLength >= MIN_STUB) action = "stub";
-  else if (prev && !same && !explicit && prevFull && to === total) action = "diff";
+  else if (prev && !same && !explicit && prevFull && from === 1 && to === total) action = "diff";
   else if (prev && !same) action = "note";
   return { action, upto };
 }
@@ -542,6 +542,7 @@ if (isMain && !process.env.GFC_CHILD_RACE) {
   ok(P({ prev: pg, total: 5000, from: 3000, to: 3100, explicit: true }).upto === null, "non-contiguous slice: no extend");
   ok(P({ prev: { ...pg, hash: "OLD" }, total: 5000, to: 1800 }).action === "note", "changed partial-seen file: note, no diff");
   ok(P({ prev: { hash: "OLD", lines: 100, upto: 50 } }).action === "note", "prev only partially seen: never diff");
+  ok(P({ prev: { ...full, hash: "OLD" }, from: 5 }).action === "note", "changed read not starting at line 1: note, never diff");
 
   // lineNoOf / visibleLines / hashOf / isSensitive
   ok(lineNoOf("1: foo") === 1 && lineNoOf("300: ") === 300 && lineNoOf("garbage") === null, "lineNoOf");
