@@ -18,5 +18,7 @@ jobs:
           node-version: ${{ matrix.node }}
       - name: Core self-test (pure + registry v2 + lock race)
         run: GFC_HOME=$(mktemp -d) node core.mjs
-      - name: MCP server battery (stub / diff / slices / edges)
+      - name: MCP + OpenCode plugin batteries
         run: node test.mjs
+        env:
+          GFC_REQUIRE_PLUGIN_TESTS: "1"

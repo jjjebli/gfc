@@ -1,12 +1,39 @@
 {
   "name": "gfc",
-  "version": "0.1.0",
-  "description": "git-for-context — LLM context dedup: unchanged file re-reads collapse to hash-verified stubs, changed files return diffs. OpenCode plugin + MCP server, zero dependencies.",
+  "version": "0.3.0",
+  "description": "git-for-context — LLM context dedup for OpenCode, Claude Code and Codex (and any MCP client): repeated file reads collapse to short stubs, changed files come back as numbered diffs. Zero dependencies.",
   "type": "module",
-  "bin": { "gfc-mcp": "./mcp.mjs" },
-  "files": ["core.mjs", "mcp.mjs", "gfc-plugin.ts", "test.mjs"],
-  "keywords": ["llm", "context", "tokens", "dedup", "mcp", "opencode", "codex"],
+  "bin": {
+    "gfc-mcp": "./mcp.mjs",
+    "gfc-hook": "./gfc-hook.mjs",
+    "gfc-setup": "./setup.mjs"
+  },
+  "files": [
+    "core.mjs",
+    "mcp.mjs",
+    "gfc-plugin.ts",
+    "gfc-hook.mjs",
+    "setup.mjs",
+    "install.sh",
+    "test.mjs"
+  ],
+  "scripts": {
+    "test": "GFC_HOME=$(mktemp -d) node core.mjs && node test.mjs"
+  },
+  "keywords": [
+    "claude-code",
+    "codex",
+    "context",
+    "dedup",
+    "hooks",
+    "llm",
+    "mcp",
+    "opencode",
+    "tokens"
+  ],
   "license": "MIT",
   "repository": "https://github.com/jjjebli/gfc",
-  "engines": { "node": ">=22" }
+  "engines": {
+    "node": ">=22"
+  }
 }

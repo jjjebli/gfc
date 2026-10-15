@@ -332,11 +332,11 @@ h2{font-size:clamp(30px,4vw,46px);line-height:1.08;letter-spacing:-0.03em;font-w
         </article>
         <article class="step" data-step="2">
           <h3>Return the delta.</h3>
-          <p>Unchanged gives a ~45-token stub that cites the hash. Changed gives a unified diff from last-seen to current. Slice reads always pass through, with a note if the file has drifted.</p>
+          <p>Unchanged gives a ~70-token stub that cites the hash, including for unchanged pages of large files. Changed gives a numbered, multi-hunk diff from last-seen to current. Reads with offset or limit always return real lines, with a note if the file has drifted.</p>
         </article>
         <article class="step" data-step="3">
           <h3>Scope to the session.</h3>
-          <p>Models are stateless, so the first full read in any session is always real content. No stub can hide something the model hasn’t seen. Compaction receives the verified-file list, so summaries stay lean.</p>
+          <p>Models are stateless, so the first read in any session is always real content. No stub can hide something the model hasn’t seen. On compaction, summaries are told not to paste file contents, and GFC forgets the session, so the next read is real content again.</p>
         </article>
       </div>
     </div>
@@ -368,7 +368,7 @@ h2{font-size:clamp(30px,4vw,46px);line-height:1.08;letter-spacing:-0.03em;font-w
           <div class="transcript" id="yes-log" role="log"><p class="empty">Nothing read yet.</p></div>
         </div>
       </div>
-      <p class="fineprint">Counts lines sent to the model, not tokens. A stub is one line here, though it costs about 45 tokens.</p>
+      <p class="fineprint">Counts lines sent to the model, not tokens. A stub is one line here, though it costs about 70 tokens.</p>
     </div>
   </section>
 
@@ -422,30 +422,27 @@ h2{font-size:clamp(30px,4vw,46px);line-height:1.08;letter-spacing:-0.03em;font-w
 
   <section class="section" id="install" aria-labelledby="install-title">
     <div class="wrap">
-      <h2 id="install-title">Install in two commands.</h2>
-      <p class="intro" style="margin-bottom:48px">Two integration paths. The plugin is enforced. The MCP server is advisory.</p>
+      <h2 id="install-title">Install in one command.</h2>
+      <p class="intro" style="margin-bottom:48px">It finds OpenCode, Claude Code and Codex on your machine and wires each one. Your own settings and hooks are kept, and every changed file is backed up.</p>
       <div class="install">
         <div>
-          <h3>OpenCode plugin</h3>
-          <p class="mode">Hard interception. Hooks the read tool. Automatic, invisible, enforced.</p>
+          <h3>OpenCode, Claude Code, Codex</h3>
+          <p class="mode">Automatic. A plugin for OpenCode’s read tool, hooks for shell reads in Claude Code and Codex.</p>
           <div class="code">
             <button class="copy" type="button">Copy</button>
-            <pre><code>git clone https://github.com/jjjebli/gfc ~/.gfc
-cp ~/.gfc/gfc-plugin.ts ~/.config/opencode/plugins/gfc.ts</code></pre>
+            <pre><code>curl -fsSL https://raw.githubusercontent.com/jjjebli/gfc/master/install.sh | bash</code></pre>
           </div>
-          <p class="after">Then restart OpenCode. There is nothing else to configure. You’ll see <code>[GFC]</code> stubs where duplicates used to be. Symlink the plugin instead of copying it, and <code>git pull</code> becomes your update path.</p>
+          <p class="after">Restart your agent. In Codex, type <code>/hooks</code> once and trust the GFC hooks. Re-run to update; <code>--uninstall</code> removes GFC and leaves your own hooks alone.</p>
         </div>
         <div>
-          <h3>MCP server</h3>
+          <h3>Any other MCP client</h3>
           <p class="mode">Advisory. Adds a <code>gfc_read</code> tool that your agent is instructed to prefer.</p>
           <div class="code">
             <button class="copy" type="button">Copy</button>
-            <pre><code># ~/.codex/config.toml
-[mcp_servers.gfc]
-command = "node"
-args = ["/Users/you/.GFC/mcp.mjs"]</code></pre>
+            <pre><code>command: node
+args: ["/Users/you/.gfc/mcp.mjs"]</code></pre>
           </div>
-          <p class="after">In interactive Codex, approve <code>gfc_read</code> once and always allow it. For <code>codex exec</code>, add <code>--approve-for-me</code>. A recommended rule for <code>~/.codex/AGENTS.md</code>: prefer <code>gfc_read</code> over <code>cat</code>, <code>head</code>, <code>sed</code>, and <code>tail</code>.</p>
+          <p class="after">Works with Cursor, Gemini CLI, Windsurf and other MCP clients. Add a rule such as “prefer <code>gfc_read</code> over <code>cat</code>, <code>head</code>, <code>sed</code>, and <code>tail</code>” to your agent instructions.</p>
         </div>
       </div>
     </div>
@@ -486,8 +483,8 @@ args = ["/Users/you/.GFC/mcp.mjs"]</code></pre>
       </div>
       <div class="ceil">
         <details>
-          <summary><span class="m">−</span><span>Diffs are single-hunk.</span><span class="tog"></span></summary>
-          <p>Scattered edits fall back to full content when the diff would be larger. A Myers upgrade happens only when that measurably hurts.</p>
+          <summary><span class="m">−</span><span>Large rewrites get full content.</span><span class="tog"></span></summary>
+          <p>Diffs are multi-hunk (Myers), but past ~1000 changed lines, or when the diff would be over 80% of the file, the full content is sent instead. Diffs also apply only when the whole previous version was read.</p>
         </details>
         <details>
           <summary><span class="m">−</span><span>Files over 512 KB are never diffed.</span><span class="tog"></span></summary>
@@ -495,7 +492,7 @@ args = ["/Users/you/.GFC/mcp.mjs"]</code></pre>
         </details>
         <details>
           <summary><span class="m">−</span><span>The OpenCode hook depends on output mutation.</span><span class="tog"></span></summary>
-          <p>It relies on <code>tool.execute.after</code> output mutation, verified on opencode 1.18.29. If a future version stops persisting it, the fallback is <code>experimental.chat.messages.transform</code> as a send-time rewriter.</p>
+          <p>It relies on <code>tool.execute.after</code> output mutation, checked against the opencode 1.19.0 source. If the read format changes, verification fails closed: output passes through untouched. OpenCode’s unreleased 2.x plugin API will need a port.</p>
         </details>
         <details>
           <summary><span class="m">−</span><span>No savings without re-reads.</span><span class="tog"></span></summary>
@@ -731,7 +728,7 @@ args = ["/Users/you/.GFC/mcp.mjs"]</code></pre>
       addEntry(yesLog, 'read · full file · 47 lines', excerpt(state.disk));
     } else if (state.seen === state.disk) {
       state.yesLines += 1;
-      addEntry(yesLog, 'stub · 1 line, about 45 tokens', [el('p', 'stub', STUB)]);
+      addEntry(yesLog, 'stub · 1 line, about 70 tokens', [el('p', 'stub', STUB)]);
     } else {
       var before = state.seen;
       state.seen = state.disk;

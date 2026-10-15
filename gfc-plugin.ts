@@ -1,27 +1,24 @@
-// GFC — git-for-context for OpenCode.
+// GFC — git-for-context for OpenCode (verified against the shipped 1.x read
+// tool: "<path>/<type>/<content>" wrapper, "N: line" rows, 2000-line /
+// 50 KB pages, long lines clamped with "... (line truncated to N chars)").
 //
-// Problem: the transcript is a linear replay. Re-reading an unchanged file
-// re-pays the same tokens every turn. This plugin intercepts read-tool
-// results BEFORE they enter the transcript:
-//   - full re-read of an unchanged file → tiny hash-verifiable stub
-//   - full read of a changed file       → unified-style diff vs what the
-//                                         model last saw (when smaller)
-//   - partial reads (offset/limit)      → pass-through, with a change-note
-//                                         header prepended if file changed
+// The transcript is a linear replay: re-reading an unchanged file re-pays the
+// same tokens every turn. This plugin rewrites read-tool results BEFORE they
+// enter the transcript. Semantics live in core.decide (shared with the MCP
+// server and unit-tested there):
+//   - plain re-read of content the model already has → tiny stub
+//     (works per page, so large paged files benefit too)
+//   - plain full re-read of a changed file → numbered diff (when smaller)
+//   - explicit offset/limit → ALWAYS the real lines (the escape hatch),
+//     with a change-note if the file drifted
 //
-// Shared logic + on-disk contract live in ~/.gfc/core.mjs (also used by the
-// MCP server for Codex). The filesystem is the store of truth: if on-disk
-// content still hashes to the registered hash, it is byte-identical to what
-// the model already saw.
-//
-// "seen" is SESSION-SCOPED: models are stateless across sessions, so the
-// first full read in any session always returns real content. Persisted
-// sid lets a resumed session (opencode -c, same sessionID) keep stubbing.
+// Safety rules:
+//   - nothing is registered unless the rows the model was shown match the
+//     file on disk right now (closes the read→hash race window)
+//   - compaction clears the session: after it, the next read is real content
+//   - sessionless calls are never intercepted
 //
 // Zero per-turn overhead: no tools registered, no system-prompt additions.
-// ponytail: tool.execute.after output mutation is persisted into the session
-// part (verified by e2e test); if that ever breaks, fall back to
-// experimental.chat.messages.transform as a send-time rewriter.
 
 import fs from "fs";
 import os from "os";
@@ -32,114 +29,102 @@ import type { Hooks } from "@opencode-ai/plugin";
 const DEBUG = !!process.env.GFC_DEBUG;
 function debug(msg: string) {
   try {
-    const dir = path.join(os.homedir(), ".gfc");
-    fs.mkdirSync(dir, { recursive: true });
+    const dir = process.env.GFC_HOME || path.join(os.homedir(), ".gfc");
+    fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
     fs.appendFileSync(path.join(dir, "debug.log"), `${new Date().toISOString()} ${msg}\n`);
   } catch {}
 }
 
-let core: any; // ~/.gfc/core.mjs, loaded in the plugin init below
+let core: any; // core.mjs, loaded in the plugin init below
 let directory = process.cwd();
+
+const CLAMP = /\.\.\.(?: \(line truncated to \d+ chars\))?$/;
+
+/** Does a displayed row faithfully show this disk line? (tolerates clamping, CR) */
+function rowMatches(shown: string, disk: string | undefined): boolean {
+  if (disk === undefined) return false;
+  if (disk.endsWith("\r")) disk = disk.slice(0, -1);
+  if (shown === disk) return true;
+  const m = CLAMP.exec(shown);
+  return !!m && shown.length - m[0].length > 0 && disk.startsWith(shown.slice(0, m.index)) && disk.length > m.index;
+}
+
+/**
+ * Extract the contiguous numbered rows of a read output and verify them
+ * against the disk lines. Returns {from,to} or null if this isn't a faithful
+ * file dump of the current disk content.
+ */
+function verifiedRange(text: string, diskLines: string[]): { from: number; to: number } | null {
+  let from: number | null = null;
+  let expect = 0;
+  for (const line of text.split("\n")) {
+    const n = core.lineNoOf(line);
+    if (n === null) {
+      if (from !== null && expect > from) break; // rows ended; trailers follow
+      continue;
+    }
+    if (from === null) {
+      from = n;
+      expect = n;
+    }
+    if (n !== expect) return null;
+    if (!rowMatches(line.slice(String(n).length + 2), diskLines[n - 1])) return null;
+    expect++;
+  }
+  return from === null ? null : { from, to: expect - 1 };
+}
 
 function interceptRead(input: any, output: any) {
   const text = typeof output.output === "string" ? output.output : "";
-  if (DEBUG) debug(`intercept tool=${input.tool} args=${JSON.stringify(input.args)} textLen=${text.length} textHead=${JSON.stringify(text.slice(0, 60))}`);
-  if (!text) return;
+  const sid = typeof input.sessionID === "string" ? input.sessionID : "";
   const filePath = input.args?.filePath;
-  if (typeof filePath !== "string" || !filePath) return;
-  if (DEBUG) debug(`intercept proceeding filePath=${filePath}`);
+  if (DEBUG) debug(`intercept sid=${sid} args=${JSON.stringify(input.args)} len=${text.length}`);
+  if (!text || !sid || typeof filePath !== "string" || !filePath) return;
+
   const abs = path.resolve(directory, filePath);
   let real = abs;
   try {
     real = fs.realpathSync(abs);
   } catch {}
-
   let stat: fs.Stats;
-  try {
-    stat = fs.statSync(real);
-  } catch {
-    return;
-  }
-  if (!stat.isFile()) return;
-
-  // Only intercept numbered file dumps ("N: content") — dirs, errors,
-  // images and attachments pass through untouched.
-  const lines = text.split("\n");
-  // Skip leading wrapper lines (<path>…, <type>…, etc.) and trailing notes.
-  let firstNo: number | null = null;
-  for (let i = 0; i < lines.length && firstNo === null; i++) firstNo = core.lineNoOf(lines[i]);
-  let lastNo: number | null = null;
-  for (let i = lines.length - 1; i >= 0 && lastNo === null; i--) lastNo = core.lineNoOf(lines[i]);
-  if (firstNo === null || lastNo === null) {
-    if (DEBUG) debug(`not a numbered dump (first=${firstNo} last=${lastNo}) — pass-through`);
-    return;
-  }
-
   let content: string;
   try {
+    stat = fs.statSync(real);
+    if (!stat.isFile()) return;
     content = fs.readFileSync(real, "utf8");
   } catch {
     return;
   }
+
+  const range = verifiedRange(text, content.split("\n"));
+  if (!range) {
+    if (DEBUG) debug(`not a verified dump of current disk content — pass-through`);
+    return;
+  }
+
   const total = core.visibleLines(content);
   const hash = core.hashOf(content);
+  const explicit = input.args?.offset != null || input.args?.limit != null;
+  const prev = core.getEntry(core.loadRegistry(), sid, real);
+  const { action, upto } = core.decide({ ...range, prev, hash, total, explicit, outputLength: text.length });
+  if (DEBUG) debug(`decide ${real} ${range.from}-${range.to}/${total} explicit=${explicit} → ${action} upto=${upto}`);
 
-  const reg = core.loadRegistry();
-  const sid = typeof input.sessionID === "string" ? input.sessionID : "";
-  // In-session knowledge only: a previous session's read never entered THIS
-  // transcript, so it can't be stubbed or diffed against.
-  const prev = core.getEntry(reg, sid, real);
-  const known = !!prev;
-  const isFull = firstNo === 1 && lastNo >= total;
-  const put = () => {
-    core.putEntry(sid, real, { hash, lines: total, ts: Date.now() });
-  };
-
-  if (!isFull) {
-    // Targeted slice: the model explicitly wants these lines. Pass through,
-    // but always warn if the file drifted from the full version in this
-    // conversation — this is correctness info, no size threshold.
-    // Registry stays untouched: partial slices never count as "seen".
-    if (known && prev!.hash !== hash) {
-      output.output =
-        `[GFC] note: file changed since the full version you saw earlier in this conversation ` +
-        `(${prev!.hash.slice(0, 12)} → ${hash.slice(0, 12)}). Lines below are the CURRENT content:\n${text}`;
-    }
-    return;
+  if (upto !== null) {
+    if (upto >= total) core.saveBlob(hash, content, stat.size, real, directory);
+    core.putEntry(sid, real, { hash, lines: total, upto, ts: Date.now() });
   }
 
-  if (known && prev!.hash === hash && text.length >= core.MIN_STUB) {
-    put();
-    output.output =
-      `[GFC] unchanged: "${real}" is byte-identical to the full content already present earlier in ` +
-      `this conversation (sha256 ${hash.slice(0, 12)}, ${total} lines, ${core.fmtKB(stat.size)}). Nothing new to show — ` +
-      `use read with offset/limit if you need specific lines again.`;
-    return;
+  if (action === "stub") {
+    output.output = core.stubText(real, hash, total, range.to, stat.size, "read it with offset=1");
+  } else if (action === "diff") {
+    const old = core.readBlob(prev.hash);
+    const diff = old === null ? null : core.lineDiff(old, content);
+    output.output = core.diffWorthIt(diff, text.length)
+      ? core.diffText(prev.hash, hash, total, diff)
+      : core.changeNote(prev.hash, hash) + text;
+  } else if (action === "note") {
+    output.output = core.changeNote(prev.hash, hash) + text;
   }
-
-  if (known && prev!.hash !== hash) {
-    const old = core.readBlob(prev!.hash);
-    if (old !== null) {
-      const diff = core.prefixSuffixDiff(old, content);
-      if (diff && diff.length < text.length) {
-        core.saveBlob(hash, content, stat.size);
-        put();
-        output.output =
-          `[GFC] changed since the full version earlier in this conversation (${prev!.hash.slice(0, 12)} → ${hash.slice(0, 12)}). ` +
-          `Diff of last-seen → current (file now has ${total} lines; use read with offset/limit for any region):\n${diff}`;
-        return;
-      }
-    }
-    // No blob, or diff larger than the full text: fall back to full + note.
-    core.saveBlob(hash, content, stat.size);
-    put();
-    output.output = `[GFC] note: file changed since the full version earlier in this conversation. Full current content:\n${text}`;
-    return;
-  }
-
-  // First full read: pass through, register + store blob for future diffing.
-  core.saveBlob(hash, content, stat.size);
-  put();
 }
 
 export default async ({ directory: dir }: { directory?: string } = {}): Promise<Hooks> => {
@@ -154,8 +139,7 @@ export default async ({ directory: dir }: { directory?: string } = {}): Promise<
         break;
       } catch {}
     }
-    if (!core) throw new Error("core.mjs not found");
-    fs.mkdirSync(core.STORE_DIR, { recursive: true });
+    if (!core?.decide) throw new Error("core.mjs not found (or outdated — re-run install.sh)");
     core.gcBlobs();
   } catch (e: any) {
     console.error(`GFC: failed to load core.mjs — plugin disabled (${e?.message ?? e})`);
@@ -172,21 +156,24 @@ export default async ({ directory: dir }: { directory?: string } = {}): Promise<
       }
     },
 
-    // Post-compaction, the model must still know which files are verified.
+    // Compaction removes earlier tool output from the model's context. Keep
+    // the summary lean (no pasted file bodies), then forget the session so
+    // the next read of any file returns real content instead of a stub that
+    // points at text the model no longer has.
     "experimental.session.compacting": async (input: any, output: any) => {
       try {
-        const reg = core.loadRegistry();
         const sid = typeof input?.sessionID === "string" ? input.sessionID : "";
-        const seen = Object.entries(reg.entries?.[sid] ?? {})
+        if (!sid) return;
+        const seen = Object.entries(core.loadRegistry().entries?.[sid] ?? {})
           .sort((x: any, y: any) => y[1].ts - x[1].ts)
           .slice(0, 40);
-        if (DEBUG) debug(`compaction hook: sid=${sid} seen_files=${seen.length} pushed=${seen.length > 0}`);
-        if (seen.length === 0) return;
+        core.clearSession(sid);
+        if (DEBUG) debug(`compaction: sid=${sid} cleared ${seen.length} files`);
+        if (seen.length === 0 || !Array.isArray(output?.context)) return;
         output.context.push(
-          "[GFC] These files were fully read earlier in this session (sha256 of full content given). " +
-            "Do NOT paste their contents into the summary; if a specific region is needed later, " +
-            "re-read it with the read tool (offset/limit):\n" +
-            seen.map(([p, e]) => `- ${p} (${e.lines} lines, hash ${e.hash.slice(0, 12)})`).join("\n"),
+          "[GFC] These files were read earlier in this session. Do NOT paste their contents into the summary — " +
+            "after compaction, reading a file again returns its full current content:\n" +
+            seen.map(([p, e]: any) => `- ${p} (${e.lines} lines)`).join("\n"),
         );
       } catch {}
     },
