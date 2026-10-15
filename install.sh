@@ -6,14 +6,22 @@ set -euo pipefail
 GFC_HOME="${GFC_HOME:-$HOME/.gfc}"
 PLUGIN_DIR="$HOME/.config/opencode/plugins"
 REPO="https://github.com/jjjebli/gfc"
+# Pin to a release tag or commit for reproducible installs: GFC_REF=v0.2.0
+GFC_REF="${GFC_REF:-}"
 
-if [ -d "$GFC_HOME/.git" ]; then
+if [ -n "$GFC_REF" ]; then
+  [ -d "$GFC_HOME/.git" ] || git clone --quiet --depth 1 "$REPO" "$GFC_HOME"
+  echo "GFC: checking out pinned ref $GFC_REF"
+  git -C "$GFC_HOME" fetch --quiet --depth 1 origin "$GFC_REF"
+  git -C "$GFC_HOME" -c advice.detachedHead=false checkout --quiet FETCH_HEAD
+elif [ -d "$GFC_HOME/.git" ]; then
   echo "GFC: updating existing clone at $GFC_HOME"
   git -C "$GFC_HOME" pull --ff-only
 else
   echo "GFC: cloning to $GFC_HOME"
   git clone --depth 1 "$REPO" "$GFC_HOME"
 fi
+chmod 700 "$GFC_HOME" 2>/dev/null || true
 
 mkdir -p "$PLUGIN_DIR"
 # Symlink when possible (git pull then updates the plugin automatically),
@@ -34,4 +42,4 @@ echo '  command = "node"'
 echo "  args = [\"$GFC_HOME/mcp.mjs\"]"
 echo
 echo "Verify (deterministic, no LLM, no network):"
-echo "  GFC_HOME=\$(mktemp -d) node $GFC_HOME/core.mjs && node $GFC_HOME/test.mjs"
+echo "  cd $GFC_HOME && npm test"
